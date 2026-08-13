@@ -5,6 +5,7 @@ An early desktop prototype of the triangular tile game, built with Godot 4.
 ## Current playable slice
 
 - The tray contains the complete 56-piece set using every unique combination from 0 through 5.
+- Three-distinct-number tiles use the official clockwise ascending order; mirrored tiles are excluded.
 - All tray pieces already show their three numbers.
 - Select any available piece from the tray.
 - Rotate the selected piece clockwise with the **Rotate piece** button or the **R** key.

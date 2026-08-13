@@ -43,7 +43,9 @@ static func generate_complete_set(max_number: int = MAX_PIECE_NUMBER) -> Array[A
 	for first_number in range(max_number + 1):
 		for second_number in range(first_number, max_number + 1):
 			for third_number in range(second_number, max_number + 1):
-				complete_set.append([first_number, second_number, third_number])
+				# Piece arrays follow the drawing vertices: top, bottom-left, bottom-right.
+				# The official tile sequence is read clockwise: top, bottom-right, bottom-left.
+				complete_set.append([first_number, third_number, second_number])
 	return complete_set
 
 

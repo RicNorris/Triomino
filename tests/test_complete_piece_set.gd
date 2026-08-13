@@ -14,11 +14,17 @@ func _init() -> void:
 		_expect(piece.size() == 3, "Every piece must contain three numbers")
 		if piece.size() != 3:
 			continue
-		_expect(piece[0] >= 0 and piece[2] <= 5, "Every number must be between 0 and 5")
-		_expect(piece[0] <= piece[1] and piece[1] <= piece[2], "Piece definitions must be ordered")
-		unique_pieces["%d-%d-%d" % piece] = true
+		var clockwise_numbers := [piece[0], piece[2], piece[1]]
+		_expect(clockwise_numbers[0] >= 0 and clockwise_numbers[2] <= 5, "Every number must be between 0 and 5")
+		_expect(
+			clockwise_numbers[0] <= clockwise_numbers[1] and clockwise_numbers[1] <= clockwise_numbers[2],
+			"Numbers must increase clockwise from the lowest corner"
+		)
+		unique_pieces["%d-%d-%d" % clockwise_numbers] = true
 
 	_expect(unique_pieces.size() == 56, "The complete set must not contain duplicates")
+	_expect(pieces.has([1, 5, 3]), "The 1-3-5 tile must use the official clockwise handedness")
+	_expect(not pieces.has([1, 3, 5]), "The mirrored 1-5-3 tile must not be included")
 	for first_number in range(6):
 		for second_number in range(first_number, 6):
 			for third_number in range(second_number, 6):
