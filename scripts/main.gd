@@ -3,12 +3,7 @@ extends Control
 const PieceScene := preload("res://scripts/triomino_piece.gd")
 const TRAY_TILE_SIZE := Vector2(136.0, 112.0)
 const TRAY_TILE_SIDE := 90.0
-
-const STARTING_PIECES: Array[Array] = [
-	[0, 0, 0], [0, 0, 1], [0, 1, 1], [1, 1, 1],
-	[0, 1, 2], [1, 2, 2], [2, 2, 2], [0, 2, 3],
-	[1, 3, 4], [2, 4, 5], [3, 5, 5], [4, 5, 5]
-]
+const MAX_PIECE_NUMBER := 5
 
 @onready var board: TriominoBoard = $Layout/Board
 @onready var piece_tray: GridContainer = $Layout/Sidebar/Margin/Content/Scroll/PieceTray
@@ -20,9 +15,11 @@ const STARTING_PIECES: Array[Array] = [
 
 var tray_pieces: Dictionary = {}
 var selected_tray_piece: TriominoPiece
+var piece_definitions: Array[Array] = []
 
 
 func _ready() -> void:
+	piece_definitions = generate_complete_set(MAX_PIECE_NUMBER)
 	_build_piece_tray()
 	board.piece_committed.connect(_on_piece_committed)
 	board.placed_count_changed.connect(_on_placed_count_changed)
@@ -32,13 +29,22 @@ func _ready() -> void:
 
 
 func _build_piece_tray() -> void:
-	for piece_id in STARTING_PIECES.size():
+	for piece_id in piece_definitions.size():
 		var piece := PieceScene.new() as TriominoPiece
 		piece.custom_minimum_size = TRAY_TILE_SIZE
-		piece.configure(piece_id, _typed_numbers(STARTING_PIECES[piece_id]), TRAY_TILE_SIDE)
+		piece.configure(piece_id, _typed_numbers(piece_definitions[piece_id]), TRAY_TILE_SIDE)
 		piece.selected.connect(_on_tray_piece_selected)
 		piece_tray.add_child(piece)
 		tray_pieces[piece_id] = piece
+
+
+static func generate_complete_set(max_number: int = MAX_PIECE_NUMBER) -> Array[Array]:
+	var complete_set: Array[Array] = []
+	for first_number in range(max_number + 1):
+		for second_number in range(first_number, max_number + 1):
+			for third_number in range(second_number, max_number + 1):
+				complete_set.append([first_number, second_number, third_number])
+	return complete_set
 
 
 func _typed_numbers(source: Array) -> Array[int]:
@@ -107,7 +113,7 @@ func _on_reset_pressed() -> void:
 	rotate_button.disabled = true
 	for piece_id in tray_pieces:
 		var piece: TriominoPiece = tray_pieces[piece_id]
-		piece.configure(piece_id, _typed_numbers(STARTING_PIECES[piece_id]), TRAY_TILE_SIDE)
+		piece.configure(piece_id, _typed_numbers(piece_definitions[piece_id]), TRAY_TILE_SIDE)
 		piece.set_selected(false)
 		piece.set_available(true)
 	status_label.text = "Choose your first piece"
