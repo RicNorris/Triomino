@@ -3,16 +3,22 @@ extends Control
 
 signal piece_committed(piece_id: int)
 signal placed_count_changed(count: int)
+signal placement_rejected(reason: String)
 
 const PieceScene := preload("res://scripts/triomino_piece.gd")
 const TILE_SIDE := 116.0
 const TILE_BOX := Vector2(138.0, 126.0)
 const SNAP_RADIUS := 72.0
+const TIP_MATCH_TOLERANCE := 3.0
 const EDGE_ROTATIONS: Array[float] = [60.0, 180.0, -60.0]
 const BOARD_COLOR := Color("#102a35")
 const GRID_COLOR := Color("#1b3b46")
 const CENTER_COLOR := Color("#5f8490")
 const OPEN_EDGE_COLOR := Color("#67b7c7")
+const LEGAL_EDGE_COLOR := Color("#63d3a0")
+const INVALID_EDGE_COLOR := Color("#a85c68")
+const LEGAL_GHOST_COLOR := Color("#e8f3dc")
+const INVALID_GHOST_COLOR := Color("#e69a9a")
 
 var selected_piece_id := -1
 var selected_numbers: Array[int] = []
@@ -62,7 +68,10 @@ func _gui_input(event: InputEvent) -> void:
 		_mouse_position = event.position
 		_update_candidate(_mouse_position)
 		if selected_piece_id >= 0 and not _hover_candidate.is_empty():
-			_place_selected_piece(_hover_candidate)
+			if _hover_candidate.is_legal:
+				_place_selected_piece(_hover_candidate)
+			else:
+				placement_rejected.emit("The touching corner numbers must match.")
 			accept_event()
 
 
@@ -99,7 +108,10 @@ func _draw_open_edges() -> void:
 			if _position_is_free(candidate.center):
 				var start: Vector2 = vertices[edge_index]
 				var finish: Vector2 = vertices[(edge_index + 1) % 3]
-				draw_line(start.lerp(finish, 0.16), start.lerp(finish, 0.84), OPEN_EDGE_COLOR, 3.0, true)
+				var edge_color := OPEN_EDGE_COLOR
+				if selected_piece_id >= 0:
+					edge_color = LEGAL_EDGE_COLOR if _candidate_is_legal(candidate, selected_numbers) else INVALID_EDGE_COLOR
+				draw_line(start.lerp(finish, 0.16), start.lerp(finish, 0.84), edge_color, 3.0, true)
 
 
 func _update_candidate(mouse_position: Vector2) -> void:
@@ -109,7 +121,7 @@ func _update_candidate(mouse_position: Vector2) -> void:
 		return
 
 	if placed_pieces.is_empty():
-		_hover_candidate = {"center": size * 0.5, "rotation": 0.0}
+		_hover_candidate = {"center": size * 0.5, "rotation": 0.0, "is_legal": true}
 	else:
 		var best_distance := SNAP_RADIUS
 		for placed in placed_pieces:
@@ -120,6 +132,7 @@ func _update_candidate(mouse_position: Vector2) -> void:
 				var distance := mouse_position.distance_to(candidate.center)
 				if distance < best_distance:
 					best_distance = distance
+					candidate["is_legal"] = _candidate_is_legal(candidate, selected_numbers)
 					_hover_candidate = candidate
 	_update_ghost()
 	queue_redraw()
@@ -138,6 +151,26 @@ func _position_is_free(candidate_center: Vector2) -> bool:
 	for placed in placed_pieces:
 		if candidate_center.distance_to(placed.center) < 5.0:
 			return false
+	return true
+
+
+func _candidate_is_legal(candidate: Dictionary, candidate_numbers: Array[int]) -> bool:
+	var candidate_vertices := TriominoPiece.get_triangle_vertices(
+		candidate.center,
+		TILE_SIDE,
+		candidate.rotation
+	)
+	for placed in placed_pieces:
+		var placed_vertices := TriominoPiece.get_triangle_vertices(
+			placed.center,
+			TILE_SIDE,
+			placed.rotation
+		)
+		for candidate_index in 3:
+			for placed_index in 3:
+				if candidate_vertices[candidate_index].distance_to(placed_vertices[placed_index]) <= TIP_MATCH_TOLERANCE:
+					if candidate_numbers[candidate_index] != placed.numbers[placed_index]:
+						return false
 	return true
 
 
@@ -182,7 +215,8 @@ func _update_ghost() -> void:
 		return
 	_ghost.visible = true
 	_ghost.position = _hover_candidate.center - TILE_BOX * 0.5
-	_ghost.configure(selected_piece_id, selected_numbers, TILE_SIDE, _hover_candidate.rotation)
+	var ghost_color := LEGAL_GHOST_COLOR if _hover_candidate.is_legal else INVALID_GHOST_COLOR
+	_ghost.configure(selected_piece_id, selected_numbers, TILE_SIDE, _hover_candidate.rotation, ghost_color)
 	move_child(_ghost, get_child_count() - 1)
 
 

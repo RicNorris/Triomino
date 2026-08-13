@@ -6,9 +6,13 @@ An early desktop prototype of the triangular tile game, built with Godot 4.
 
 - All tray pieces already show their three numbers.
 - Select any available piece from the tray.
+- Rotate the selected piece clockwise with the **Rotate piece** button or the **R** key.
 - The first piece is always placed at the exact center of the board.
-- Further pieces snap edge-to-edge onto any highlighted open edge.
-- Number-matching and scoring rules are intentionally not enforced yet.
+- Further pieces snap edge-to-edge onto open edges.
+- Both numbers on a shared edge must match.
+- Any additional corner that touches another corner must show the same number.
+- Green edges accept the selected rotation; red edges reject it.
+- Scoring rules are intentionally not enforced yet.
 - Reset starts a fresh board and returns every piece to the tray.
 
 ## Project structure

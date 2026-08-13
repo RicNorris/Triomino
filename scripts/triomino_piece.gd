@@ -54,6 +54,13 @@ func set_available(value: bool) -> void:
 	queue_redraw()
 
 
+func rotate_numbers_clockwise() -> void:
+	if numbers.size() != 3:
+		return
+	numbers = [numbers[1], numbers[2], numbers[0]]
+	queue_redraw()
+
+
 func _gui_input(event: InputEvent) -> void:
 	if not interactive or not is_available:
 		return

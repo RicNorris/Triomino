@@ -80,6 +80,16 @@ theme_override_font_sizes/font_size = 14
 text = "Select a piece below, then click the board.\nThe first piece always lands in the center."
 autowrap_mode = 2
 
+[node name="PieceControls" type="HBoxContainer" parent="Layout/Sidebar/Margin/Content"]
+layout_mode = 2
+
+[node name="RotateButton" type="Button" parent="Layout/Sidebar/Margin/Content/PieceControls"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "Rotate piece (R)"
+
 [node name="TrayLabel" type="Label" parent="Layout/Sidebar/Margin/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.08, 0.13, 0.18, 1)

@@ -14,6 +14,7 @@ const STARTING_PIECES: Array[Array] = [
 @onready var piece_tray: GridContainer = $Layout/Sidebar/Margin/Content/Scroll/PieceTray
 @onready var status_label: Label = $Layout/Sidebar/Margin/Content/Status
 @onready var instructions_label: Label = $Layout/Sidebar/Margin/Content/Instructions
+@onready var rotate_button: Button = $Layout/Sidebar/Margin/Content/PieceControls/RotateButton
 @onready var piece_count_label: Label = $Layout/Sidebar/Margin/Content/Footer/PieceCount
 @onready var reset_button: Button = $Layout/Sidebar/Margin/Content/Footer/ResetButton
 
@@ -25,6 +26,8 @@ func _ready() -> void:
 	_build_piece_tray()
 	board.piece_committed.connect(_on_piece_committed)
 	board.placed_count_changed.connect(_on_placed_count_changed)
+	board.placement_rejected.connect(_on_placement_rejected)
+	rotate_button.pressed.connect(_rotate_selected_piece)
 	reset_button.pressed.connect(_on_reset_pressed)
 
 
@@ -51,13 +54,14 @@ func _on_tray_piece_selected(piece: TriominoPiece) -> void:
 	selected_tray_piece = piece
 	piece.set_selected(true)
 	board.select_piece(piece.piece_id, piece.numbers)
+	rotate_button.disabled = false
 
 	if board.placed_pieces.is_empty():
 		status_label.text = "First piece selected"
-		instructions_label.text = "Click anywhere on the board.\nIt will be placed exactly in the center."
+		instructions_label.text = "Rotate with R if needed, then click the board.\nIt will be placed exactly in the center."
 	else:
 		status_label.text = "Piece selected"
-		instructions_label.text = "Hover near a glowing open edge,\nthen click to attach the piece."
+		instructions_label.text = "Rotate with R. Green edges match;\nred edges are blocked."
 
 
 func _on_piece_committed(piece_id: int) -> void:
@@ -65,8 +69,32 @@ func _on_piece_committed(piece_id: int) -> void:
 	piece.set_selected(false)
 	piece.set_available(false)
 	selected_tray_piece = null
+	rotate_button.disabled = true
 	status_label.text = "Piece placed"
-	instructions_label.text = "Choose another numbered piece, then\nattach it to any glowing open edge."
+	instructions_label.text = "Choose another numbered piece. Matching\ncorner numbers are required on every contact."
+
+
+func _rotate_selected_piece() -> void:
+	if selected_tray_piece == null:
+		return
+	selected_tray_piece.rotate_numbers_clockwise()
+	board.select_piece(selected_tray_piece.piece_id, selected_tray_piece.numbers)
+	status_label.text = "Piece rotated clockwise"
+	if board.placed_pieces.is_empty():
+		instructions_label.text = "Press R again or click the board to place it\nexactly in the center."
+	else:
+		instructions_label.text = "Green edges match this rotation;\nred edges are blocked."
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+		_rotate_selected_piece()
+		get_viewport().set_input_as_handled()
+
+
+func _on_placement_rejected(reason: String) -> void:
+	status_label.text = "Placement blocked"
+	instructions_label.text = reason + "\nRotate the piece or choose a green edge."
 
 
 func _on_placed_count_changed(count: int) -> void:
@@ -76,7 +104,10 @@ func _on_placed_count_changed(count: int) -> void:
 func _on_reset_pressed() -> void:
 	board.reset_board()
 	selected_tray_piece = null
-	for piece: TriominoPiece in tray_pieces.values():
+	rotate_button.disabled = true
+	for piece_id in tray_pieces:
+		var piece: TriominoPiece = tray_pieces[piece_id]
+		piece.configure(piece_id, _typed_numbers(STARTING_PIECES[piece_id]), TRAY_TILE_SIDE)
 		piece.set_selected(false)
 		piece.set_available(true)
 	status_label.text = "Choose your first piece"
