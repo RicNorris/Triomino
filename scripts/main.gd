@@ -7,6 +7,7 @@ const MAX_PIECE_NUMBER := 5
 
 @onready var board: TriominoBoard = $Layout/Board
 @onready var piece_tray: GridContainer = $Layout/Sidebar/Margin/Content/Scroll/PieceTray
+@onready var score_value_label: Label = $Layout/Sidebar/Margin/Content/ScorePanel/ScoreMargin/ScoreRow/ScoreValue
 @onready var status_label: Label = $Layout/Sidebar/Margin/Content/Status
 @onready var instructions_label: Label = $Layout/Sidebar/Margin/Content/Instructions
 @onready var rotate_button: Button = $Layout/Sidebar/Margin/Content/PieceControls/RotateButton
@@ -16,6 +17,7 @@ const MAX_PIECE_NUMBER := 5
 var tray_pieces: Dictionary = {}
 var selected_tray_piece: TriominoPiece
 var piece_definitions: Array[Array] = []
+var total_score := 0
 
 
 func _ready() -> void:
@@ -74,12 +76,27 @@ func _on_tray_piece_selected(piece: TriominoPiece) -> void:
 
 func _on_piece_committed(piece_id: int) -> void:
 	var piece: TriominoPiece = tray_pieces[piece_id]
+	var points_earned := calculate_placed_piece_score(piece.numbers)
+	add_score(points_earned)
 	piece.set_selected(false)
 	piece.set_available(false)
 	selected_tray_piece = null
 	rotate_button.disabled = true
 	status_label.text = "Piece placed"
 	instructions_label.text = "Choose another numbered piece. Matching\ncorner numbers are required on every contact."
+
+
+# ADD YOUR SCORE CALCULATION HERE.
+# `piece_numbers` contains the three numbers on the piece that was just placed.
+# `board.placed_pieces` contains the complete board, including that new piece.
+# Return the points earned by this placement; the counter updates automatically.
+func calculate_placed_piece_score(piece_numbers: Array[int]) -> int:
+	return 0
+
+
+func add_score(points: int) -> void:
+	total_score += points
+	score_value_label.text = str(total_score)
 
 
 func _rotate_selected_piece() -> void:
@@ -111,6 +128,8 @@ func _on_placed_count_changed(count: int) -> void:
 
 func _on_reset_pressed() -> void:
 	board.reset_board()
+	total_score = 0
+	score_value_label.text = "0"
 	selected_tray_piece = null
 	rotate_button.disabled = true
 	for piece_id in tray_pieces:

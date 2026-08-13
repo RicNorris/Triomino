@@ -14,8 +14,25 @@ An early desktop prototype of the triangular tile game, built with Godot 4.
 - Both numbers on a shared edge must match.
 - Any additional corner that touches another corner must show the same number.
 - Green edges accept the selected rotation; red edges reject it.
-- Scoring rules are intentionally not enforced yet.
+- A score counter is visible and resets with the board.
+- The scoring formula is intentionally left as a user-editable hook.
 - Reset starts a fresh board and returns every piece to the tray.
+
+## Adding the scoring formula
+
+Edit `calculate_placed_piece_score()` in `scripts/main.gd`. It receives the three
+numbers from the piece that was just placed. Return the number of points earned:
+
+```gdscript
+func calculate_placed_piece_score(piece_numbers: Array[int]) -> int:
+	# Replace this example with your own rules.
+	return piece_numbers[0] + piece_numbers[1] + piece_numbers[2]
+```
+
+The returned number is automatically added to the visible score counter. For
+bonuses based on the board shape, inspect `board.placed_pieces`; it already
+contains the newly placed piece. You can also call `add_score(points)` directly
+when another game event should change the counter.
 
 ## Project structure
 
