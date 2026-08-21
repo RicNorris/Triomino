@@ -143,12 +143,6 @@ layout_mode = 2
 size_flags_horizontal = 3
 text = "Draw from well"
 
-[node name="DrawCountLabel" type="Label" parent="Layout/Sidebar/Margin/Content" unique_id=781799285]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.36, 0.42, 1)
-theme_override_font_sizes/font_size = 13
-text = "DRAWS THIS TURN: 0"
-
 [node name="TrayLabel" type="Label" parent="Layout/Sidebar/Margin/Content" unique_id=1136546655]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.08, 0.13, 0.18, 1)

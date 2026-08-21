@@ -21,9 +21,13 @@ window/size/viewport_width=1280
 window/size/viewport_height=800
 window/size/window_width_override=1280
 window/size/window_height_override=800
-window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[editor]
+
+version_control/plugin_name="GitPlugin"
+version_control/autoload_on_startup=true
 
 [physics]
 

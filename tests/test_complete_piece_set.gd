@@ -1,12 +1,12 @@
 extends SceneTree
 
-const MainScript := preload("res://scripts/main.gd")
+const PieceCatalog := preload("res://scripts/piece_catalog.gd")
 
 var _failures := 0
 
 
 func _init() -> void:
-	var pieces: Array[Array] = MainScript.generate_complete_set(5)
+	var pieces: Array[Array] = PieceCatalog.generate_complete_set(5)
 	_expect(pieces.size() == 56, "A double-six set must contain 56 pieces")
 
 	var unique_pieces: Dictionary = {}

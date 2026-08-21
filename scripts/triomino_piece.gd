@@ -6,7 +6,7 @@ signal selected(piece: TriominoPiece)
 const INK := Color("#13212c")
 const OUTLINE := Color("#192b37")
 const SELECTED_OUTLINE := Color("#f6b73c")
-const DISABLED_FILL := Color("#7c8991")
+const DISABLED_FILL := Color("#b8c5c9")
 
 var piece_id := -1
 var numbers: Array[int] = [0, 0, 0]

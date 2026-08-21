@@ -4,6 +4,7 @@ extends Control
 signal piece_committed(piece_id: int)
 signal placed_count_changed(count: int)
 signal placement_rejected(reason: String)
+signal placement_requested(piece_id: int, numbers: Array[int], center_offset: Vector2, rotation: float)
 
 const PieceScene := preload("res://scripts/triomino_piece.gd")
 const TILE_SIDE := 116.0
@@ -11,14 +12,14 @@ const TILE_BOX := Vector2(138.0, 126.0)
 const SNAP_RADIUS := 72.0
 const TIP_MATCH_TOLERANCE := 3.0
 const EDGE_ROTATIONS: Array[float] = [60.0, 180.0, -60.0]
-const BOARD_COLOR := Color("#102a35")
-const GRID_COLOR := Color("#1b3b46")
-const CENTER_COLOR := Color("#5f8490")
-const OPEN_EDGE_COLOR := Color("#67b7c7")
-const LEGAL_EDGE_COLOR := Color("#63d3a0")
-const INVALID_EDGE_COLOR := Color("#a85c68")
-const LEGAL_GHOST_COLOR := Color("#e8f3dc")
-const INVALID_GHOST_COLOR := Color("#e69a9a")
+const BOARD_COLOR := Color("#e8f1f2")
+const GRID_COLOR := Color("#d2e1e3")
+const CENTER_COLOR := Color("#6e9299")
+const OPEN_EDGE_COLOR := Color("#639ba5")
+const LEGAL_EDGE_COLOR := Color("#36a875")
+const INVALID_EDGE_COLOR := Color("#c95668")
+const LEGAL_GHOST_COLOR := Color("#dff3e5")
+const INVALID_GHOST_COLOR := Color("#f5c9cf")
 
 var selected_piece_id := -1
 var selected_numbers: Array[int] = []
@@ -69,7 +70,12 @@ func _gui_input(event: InputEvent) -> void:
 		_update_candidate(_mouse_position)
 		if selected_piece_id >= 0 and not _hover_candidate.is_empty():
 			if _hover_candidate.is_legal:
-				_place_selected_piece(_hover_candidate)
+				placement_requested.emit(
+					selected_piece_id,
+					selected_numbers.duplicate(),
+					_hover_candidate.center - size * 0.5,
+					_hover_candidate.rotation
+				)
 			else:
 				placement_rejected.emit("The touching corner numbers must match.")
 			accept_event()
@@ -174,26 +180,89 @@ func _candidate_is_legal(candidate: Dictionary, candidate_numbers: Array[int]) -
 	return true
 
 
-func _place_selected_piece(candidate: Dictionary) -> void:
+func is_network_placement_legal(center_offset: Vector2, rotation: float, numbers: Array[int]) -> bool:
+	var requested_center := size * 0.5 + center_offset
+	if placed_pieces.is_empty():
+		return requested_center.distance_to(size * 0.5) <= TIP_MATCH_TOLERANCE \
+			and absf(angle_difference(deg_to_rad(rotation), 0.0)) <= 0.001
+
+	for placed in placed_pieces:
+		for edge_index in 3:
+			var candidate := _candidate_across_edge(placed, edge_index)
+			if candidate.center.distance_to(requested_center) > TIP_MATCH_TOLERANCE:
+				continue
+			if absf(angle_difference(deg_to_rad(candidate.rotation), deg_to_rad(rotation))) > 0.001:
+				continue
+			return _position_is_free(candidate.center) and _candidate_is_legal(candidate, numbers)
+	return false
+
+
+func get_placement_features(center_offset: Vector2, rotation: float) -> Dictionary:
+	var candidate_vertices := TriominoPiece.get_triangle_vertices(
+		size * 0.5 + center_offset,
+		TILE_SIDE,
+		rotation
+	)
+	var touching_corner_count := 0
+	var completed_hexagons := 0
+
+	for candidate_vertex in candidate_vertices:
+		var triangles_already_at_corner := 0
+		for placed in placed_pieces:
+			var placed_vertices := TriominoPiece.get_triangle_vertices(
+				placed.center,
+				TILE_SIDE,
+				placed.rotation
+			)
+			for placed_vertex in placed_vertices:
+				if candidate_vertex.distance_to(placed_vertex) <= TIP_MATCH_TOLERANCE:
+					triangles_already_at_corner += 1
+					break
+		if triangles_already_at_corner > 0:
+			touching_corner_count += 1
+		if triangles_already_at_corner == 5:
+			completed_hexagons += 1
+
+	return {
+		"touching_corners": touching_corner_count,
+		"hexagons": completed_hexagons,
+		"bridge": touching_corner_count == 3 and completed_hexagons == 0
+	}
+
+
+func commit_network_piece(
+	piece_id: int,
+	numbers: Array[int],
+	center_offset: Vector2,
+	rotation: float
+) -> void:
+	var candidate := {
+		"center": size * 0.5 + center_offset,
+		"rotation": rotation,
+		"is_legal": true
+	}
+	_place_piece(piece_id, numbers, candidate)
+
+
+func _place_piece(piece_id: int, numbers: Array[int], candidate: Dictionary) -> void:
 	var piece := PieceScene.new() as TriominoPiece
 	piece.interactive = false
 	piece.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	piece.custom_minimum_size = TILE_BOX
 	piece.size = TILE_BOX
 	piece.position = candidate.center - TILE_BOX * 0.5
-	piece.configure(selected_piece_id, selected_numbers, TILE_SIDE, candidate.rotation)
+	piece.configure(piece_id, numbers, TILE_SIDE, candidate.rotation)
 	add_child(piece)
 
 	placed_pieces.append({
 		"node": piece,
-		"piece_id": selected_piece_id,
-		"numbers": selected_numbers.duplicate(),
+		"piece_id": piece_id,
+		"numbers": numbers.duplicate(),
 		"center": candidate.center,
 		"rotation": candidate.rotation
 	})
-	var committed_id := selected_piece_id
 	clear_selection()
-	piece_committed.emit(committed_id)
+	piece_committed.emit(piece_id)
 	placed_count_changed.emit(placed_pieces.size())
 	queue_redraw()
 
