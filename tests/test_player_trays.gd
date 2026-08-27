@@ -47,6 +47,11 @@ func _run() -> void:
 		if main.tray_pieces[piece_id].visible:
 			visible_count += 1
 	_expect(visible_count == main.dealer.pieces_per_player, "Only the local player's assigned pieces should be visible")
+	var visible_tray_order: Array[int] = []
+	for child in main.piece_tray.get_children():
+		if child.visible:
+			visible_tray_order.append(child.piece_id)
+	_expect(visible_tray_order == trays[1], "The rack should preserve the order in which tiles were dealt")
 
 	var well_size_before_draw: int = main.dealer.piece_well.size()
 	var expected_drawn_piece: int = main.dealer.piece_well[0]
@@ -54,6 +59,11 @@ func _run() -> void:
 	_expect(main.dealer.piece_well.size() == well_size_before_draw - 1, "Drawing should remove one piece from the well")
 	_expect(main.state.has_tray_piece(1, expected_drawn_piece), "The drawn piece should enter the requesting player's tray")
 	_expect(main.tray_pieces[expected_drawn_piece].visible, "The local player should see the drawn piece")
+	visible_tray_order.clear()
+	for child in main.piece_tray.get_children():
+		if child.visible:
+			visible_tray_order.append(child.piece_id)
+	_expect(visible_tray_order[-1] == expected_drawn_piece, "A newly drawn tile should appear at the right end of the rack")
 	_expect(not main.draw_from_well_button.disabled, "The draw button should remain enabled while the well has pieces")
 
 	var final_well_piece: int = main.dealer.piece_well[0]

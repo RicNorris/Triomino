@@ -6,20 +6,22 @@ const PieceCatalogScript := preload("res://scripts/piece_catalog.gd")
 const RoundDealerScript := preload("res://scripts/round_dealer.gd")
 const ScoringScript := preload("res://scripts/scoring.gd")
 const GameStateScript := preload("res://scripts/game_state.gd")
+const GameHudScript := preload("res://scripts/game_hud.gd")
 
-const TRAY_TILE_SIZE := Vector2(136.0, 112.0)
-const TRAY_TILE_SIDE := 90.0
+const TRAY_TILE_SIZE := Vector2(116.0, 106.0)
+const TRAY_TILE_SIDE := 82.0
+const HAND_TRAY_BASE_HEIGHT := 218.0
+const HAND_TRAY_ROW_HEIGHT := 114.0
+const HAND_TRAY_COLLAPSED_HEIGHT := 58.0
 const MAX_PIECE_NUMBER := 5
 const GAME_PORT := 28745
 const MAX_PLAYERS := 4
-const TEST_WIN_SCORE := 10
 
 @onready var network: TriominoMultiplayerSession = $MultiplayerSession
 @onready var board: TriominoBoard = $Layout/Board
-@onready var piece_tray: GridContainer = $Layout/Sidebar/Margin/Content/Scroll/PieceTray
+@onready var piece_tray: Container = $Layout/Sidebar/Margin/Content/Scroll/PieceTray
 @onready var score_value_label: Label = $Layout/Sidebar/Margin/Content/ScorePanel/ScoreMargin/ScoreRow/ScoreValue
 @onready var turn_label: Label = $Layout/Sidebar/Margin/Content/TurnLabel
-@onready var players_label: Label = $Layout/Sidebar/Margin/Content/PlayersLabel
 @onready var status_label: Label = $Layout/Sidebar/Margin/Content/Status
 @onready var instructions_label: Label = $Layout/Sidebar/Margin/Content/Instructions
 @onready var rotate_button: Button = $Layout/Sidebar/Margin/Content/PieceControls/RotateButton
@@ -27,6 +29,24 @@ const TEST_WIN_SCORE := 10
 @onready var reset_button: Button = $Layout/Sidebar/Margin/Content/Footer/ResetButton
 @onready var draw_from_well_button: Button =$Layout/Sidebar/Margin/Content/PieceControls/DrawFromWellButton
 @onready var draw_count_label: Label = $Layout/Sidebar/Margin/Content/DrawCountLabel
+
+var turn_panel: PanelContainer
+var player_cards_container: HBoxContainer
+var hand_count_label: Label
+var well_count_label: Label
+var hand_panel: PanelContainer
+var tray_toggle_button: Button
+var tray_well: PanelContainer
+var board_area: MarginContainer
+var hand_tray_open := true
+var hand_tray_height := HAND_TRAY_BASE_HEIGHT
+var hand_tray_tween: Tween
+var fullscreen_button: Button
+var responsive_layout_queued := false
+var zoom_out_button: Button
+var zoom_in_button: Button
+var center_view_button: Button
+var zoom_label: Label
 
 @onready var lobby_overlay: Control = $LobbyOverlay
 @onready var lobby_status_label: Label = $LobbyOverlay/Center/Panel/Margin/Content/Status
@@ -60,6 +80,8 @@ var network_port := GAME_PORT
 
 
 func _ready() -> void:
+	_install_modern_hud()
+	resized.connect(_on_main_resized)
 	piece_definitions = PieceCatalogScript.generate_complete_set(MAX_PIECE_NUMBER)
 	_build_piece_tray()
 	_connect_ui_signals()
@@ -69,13 +91,46 @@ func _ready() -> void:
 	_refresh_lobby_ui()
 
 
+func _install_modern_hud() -> void:
+	var hud: Dictionary = GameHudScript.build(self, board)
+	piece_tray = hud.piece_tray
+	score_value_label = hud.score_value
+	turn_label = hud.turn_label
+	turn_panel = hud.turn_panel
+	player_cards_container = hud.player_cards
+	status_label = hud.status
+	instructions_label = hud.instructions
+	rotate_button = hud.rotate_button
+	draw_from_well_button = hud.draw_button
+	draw_count_label = hud.draw_count
+	piece_count_label = hud.board_count
+	hand_count_label = hud.hand_count
+	well_count_label = hud.well_count
+	reset_button = hud.reset_button
+	fullscreen_button = hud.fullscreen_button
+	hand_panel = hud.hand_panel
+	tray_toggle_button = hud.tray_toggle
+	tray_well = hud.tray_well
+	board_area = hud.board_area
+	zoom_out_button = hud.zoom_out_button
+	zoom_in_button = hud.zoom_in_button
+	center_view_button = hud.center_view_button
+	zoom_label = hud.zoom_label
+
+
 func _connect_ui_signals() -> void:
 	board.placement_requested.connect(_on_board_placement_requested)
 	board.placed_count_changed.connect(_on_placed_count_changed)
 	board.placement_rejected.connect(_on_placement_rejected)
+	board.view_changed.connect(_on_board_view_changed)
 	rotate_button.pressed.connect(_rotate_selected_piece)
 	reset_button.pressed.connect(_on_reset_pressed)
+	fullscreen_button.pressed.connect(_toggle_fullscreen)
+	zoom_out_button.pressed.connect(board.zoom_out)
+	zoom_in_button.pressed.connect(board.zoom_in)
+	center_view_button.pressed.connect(board.reset_view)
 	draw_from_well_button.pressed.connect(_draw_from_well)
+	tray_toggle_button.pressed.connect(_toggle_hand_tray)
 	host_button.pressed.connect(_host_lobby)
 	join_button.pressed.connect(_join_lobby)
 	copy_button.pressed.connect(_copy_lobby_code)
@@ -131,11 +186,11 @@ func _on_tray_piece_selected(piece: TriominoPiece) -> void:
 	board.select_piece(piece.piece_id, piece.numbers)
 	rotate_button.disabled = false
 	if board.placed_pieces.is_empty():
-		status_label.text = "First piece selected"
-		instructions_label.text = "Rotate with R if needed, then click the board.\nIt will be placed exactly in the center."
+		status_label.text = "Great pick! Pop it in the middle ★"
+		instructions_label.text = "Spin it with R if you like, then click the big target."
 	else:
-		status_label.text = "Piece selected"
-		instructions_label.text = "Rotate with R. Green edges match;\nred edges are blocked."
+		status_label.text = "Ooh, nice tile!"
+		instructions_label.text = "Green means go! Spin with R until the numbers are happy."
 
 
 func _rotate_selected_piece() -> void:
@@ -143,7 +198,7 @@ func _rotate_selected_piece() -> void:
 		return
 	selected_tray_piece.rotate_numbers_clockwise()
 	board.select_piece(selected_tray_piece.piece_id, selected_tray_piece.numbers)
-	status_label.text = "Piece rotated clockwise"
+	status_label.text = "Wheee! One spin clockwise ↻"
 	if board.placed_pieces.is_empty():
 		instructions_label.text = "Press R again or click the board to place it\nexactly in the center."
 	else:
@@ -159,18 +214,103 @@ func _draw_from_well() -> void:
 	status_label.text = "Checking move…"
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
-		_rotate_selected_piece()
-		get_viewport().set_input_as_handled()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R:
+			_rotate_selected_piece()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_H:
+			_toggle_hand_tray()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_F11:
+			_toggle_fullscreen()
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_C:
+			board.reset_view()
+			get_viewport().set_input_as_handled()
+
+
+func _on_board_view_changed(zoom_percent: int) -> void:
+	zoom_label.text = "%d%%" % zoom_percent
+
+
+func _toggle_fullscreen() -> void:
+	var current_mode := DisplayServer.window_get_mode()
+	var is_fullscreen := current_mode in [
+		DisplayServer.WINDOW_MODE_FULLSCREEN,
+		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN,
+	]
+	DisplayServer.window_set_mode(
+		DisplayServer.WINDOW_MODE_WINDOWED if is_fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN
+	)
+	_queue_responsive_layout()
+
+
+func _toggle_hand_tray() -> void:
+	hand_tray_open = not hand_tray_open
+	_set_hand_tray_position(true)
+
+
+func _set_hand_tray_position(animate: bool) -> void:
+	if hand_tray_tween != null and hand_tray_tween.is_valid():
+		hand_tray_tween.kill()
+	var target_top := -hand_tray_height if hand_tray_open else -HAND_TRAY_COLLAPSED_HEIGHT
+	var target_bottom := 0.0 if hand_tray_open else hand_tray_height - HAND_TRAY_COLLAPSED_HEIGHT
+	var board_target_bottom := -(hand_tray_height - 54.0) if hand_tray_open else 0.0
+	if animate:
+		hand_tray_tween = create_tween()
+		hand_tray_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		hand_tray_tween.set_parallel(true)
+		hand_tray_tween.tween_property(hand_panel, "offset_top", target_top, 0.38)
+		hand_tray_tween.tween_property(hand_panel, "offset_bottom", target_bottom, 0.38)
+		hand_tray_tween.tween_property(board_area, "offset_bottom", board_target_bottom, 0.38)
+	else:
+		hand_panel.offset_top = target_top
+		hand_panel.offset_bottom = target_bottom
+		board_area.offset_bottom = board_target_bottom
+	_refresh_tray_toggle_copy()
+
+
+func _refresh_tray_toggle_copy() -> void:
+	if hand_tray_open:
+		tray_toggle_button.text = "▼  Hide my tiles  H"
+	elif _is_local_turn():
+		tray_toggle_button.text = "▲  MY TURN! Open  H"
+	else:
+		tray_toggle_button.text = "▲  Show my tiles  H"
+
+
+func _on_main_resized() -> void:
+	_queue_responsive_layout()
+
+
+func _queue_responsive_layout() -> void:
+	if responsive_layout_queued:
+		return
+	responsive_layout_queued = true
+	_apply_responsive_layout.call_deferred()
+
+
+func _apply_responsive_layout() -> void:
+	responsive_layout_queued = false
+	if not is_inside_tree():
+		return
+	_rebuild_player_cards()
+	_update_tray_layout(false)
+	var current_mode := DisplayServer.window_get_mode()
+	var is_fullscreen := current_mode in [
+		DisplayServer.WINDOW_MODE_FULLSCREEN,
+		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN,
+	]
+	fullscreen_button.text = "↙  Windowed" if is_fullscreen else "□  Fullscreen"
 
 
 func _on_placement_rejected(reason: String) -> void:
-	status_label.text = "Placement blocked"
-	instructions_label.text = reason + "\nRotate the piece or choose a green edge."
+	status_label.text = "Bonk! That spot doesn't fit"
+	instructions_label.text = reason + " Try a green spot or give the tile a spin."
 
 
 func _on_placed_count_changed(count: int) -> void:
-	piece_count_label.text = "%d piece%s placed" % [count, "" if count == 1 else "s"]
+	piece_count_label.text = "%d tile%s on the playmat" % [count, "" if count == 1 else "s"]
 
 
 func _on_reset_pressed() -> void:
@@ -322,16 +462,17 @@ func _apply_piece_drawn(peer_id: int, piece_id: int, well_piece_count: int) -> v
 	state.well_piece_count = well_piece_count
 	state.player_current_turn_draws += 1
 	var player_name: String = state.players.get(peer_id, "A player")
-	status_label.text = "%s drew a piece from the well" % player_name
+	status_label.text = "%s grabbed a mystery tile!" % player_name
 	if peer_id == multiplayer.get_unique_id():
 		var drawn_piece: TriominoPiece = tray_pieces[piece_id]
 		drawn_piece.visible = true
 		drawn_piece.set_available(state.game_started)
+		_sync_tray_order()
 		instructions_label.text = "The new piece was added to your tray. You may still place a piece."
 	else:
 		instructions_label.text = "%s is still choosing a piece." % player_name
-	draw_count_label.text = "DRAWS THIS TURN: %d" % state.player_current_turn_draws
-	_update_draw_button()
+	draw_count_label.text = "%d / 3" % state.player_current_turn_draws
+	_update_game_ui()
 
 func _process_play_request(
 	peer_id: int,
@@ -359,7 +500,7 @@ func _process_play_request(
 		network.reject_move_for(peer_id, "That placement does not match the board.")
 		return
 	var board_features := board.get_placement_features(center_offset, rotation)
-	var score_breakdown := scoring.placement_score(numbers, board_features)
+	var score_breakdown := scoring.placement_score(numbers, board_features, state.player_current_turn_draws)
 	var updated_scores := state.player_scores.duplicate()
 	updated_scores[peer_id] = int(updated_scores.get(peer_id, 0)) + int(score_breakdown.total)
 	var next_turn := (state.current_turn_index + 1) % state.player_order.size()
@@ -374,13 +515,10 @@ func _process_play_request(
 		next_turn
 	)
 
-	# Temporary test rule requested during development: score over 10 wins the round.
-	if updated_scores[peer_id] > TEST_WIN_SCORE:
-		declare_winner(peer_id)
 
 
 func _on_move_rejected(reason: String) -> void:
-	status_label.text = "Move rejected"
+	status_label.text = "Oopsie! Try another move"
 	instructions_label.text = reason
 	_update_draw_button()
 
@@ -408,7 +546,7 @@ func _apply_placement(
 	selected_tray_piece = null
 	rotate_button.disabled = true
 	var player_name: String = state.players.get(peer_id, "A player")
-	status_label.text = "%s scored %d" % [player_name, int(score_breakdown.total)]
+	status_label.text = "%s got %d points! ✦" % [player_name, int(score_breakdown.total)]
 	if int(score_breakdown.bonus) > 0:
 		instructions_label.text = "%d tile points + %d %s bonus" % [
 			int(score_breakdown.tile_points),
@@ -417,6 +555,12 @@ func _apply_placement(
 		]
 	else:
 		instructions_label.text = "%d points from the tile." % int(score_breakdown.tile_points)
+	var local_peer_id := multiplayer.get_unique_id()
+	var remaining := _remaining_piece_count(local_peer_id)
+
+	if remaining == 0:
+		declare_winner(local_peer_id)
+
 	_update_game_ui()
 
 
@@ -526,6 +670,8 @@ func _reset_board_and_tray() -> void:
 		piece.set_available(true)
 	status_label.text = "Waiting for the first move"
 	instructions_label.text = "The first player chooses a piece and places it in the center."
+	draw_count_label.text = "0 / 3"
+	_update_hand_count()
 
 
 func _set_game_controls_enabled(enabled: bool) -> void:
@@ -534,12 +680,25 @@ func _set_game_controls_enabled(enabled: bool) -> void:
 	var has_assigned_tray := state.player_tray_piece_ids.has(local_peer_id)
 	for piece_id in tray_pieces:
 		var piece: TriominoPiece = tray_pieces[piece_id]
-		var belongs_to_local_tray := not has_assigned_tray or state.has_tray_piece(local_peer_id, piece_id)
+		var belongs_to_local_tray := has_assigned_tray and state.has_tray_piece(local_peer_id, piece_id)
 		var was_used := state.has_used_piece(local_peer_id, piece_id)
 		piece.visible = belongs_to_local_tray and not was_used
 		piece.set_available(enabled and belongs_to_local_tray and not was_used)
+	_sync_tray_order()
 	rotate_button.disabled = true
 	_update_draw_button()
+
+
+func _sync_tray_order() -> void:
+	var local_peer_id := multiplayer.get_unique_id()
+	var acquired_piece_ids: Array = state.player_tray_piece_ids.get(local_peer_id, [])
+	var target_index := 0
+	for piece_id in acquired_piece_ids:
+		if not tray_pieces.has(piece_id):
+			continue
+		var piece: TriominoPiece = tray_pieces[piece_id]
+		piece_tray.move_child(piece, target_index)
+		target_index += 1
 
 
 func _update_draw_button() -> void:
@@ -549,33 +708,144 @@ func _update_draw_button() -> void:
 		or state.well_piece_count <= 0
 		or state.player_current_turn_draws >= 3
 	)
-	draw_from_well_button.tooltip_text = "%d pieces remaining" % state.well_piece_count
+	draw_from_well_button.tooltip_text = "%d mystery tiles remaining" % state.well_piece_count
+	well_count_label.text = "MYSTERY PILE  %d" % state.well_piece_count
+	draw_count_label.text = "%d / 3" % state.player_current_turn_draws
 
 
 func _update_game_ui() -> void:
 	if not state.game_started or state.player_order.is_empty():
-		turn_label.text = "Waiting for a game"
-		players_label.text = "Players will appear here"
+		turn_label.text = "★  READY TO PLAY?  ★"
+		turn_panel.add_theme_stylebox_override("panel", GameHudScript.turn_style(false))
 		score_value_label.text = "0"
+		_rebuild_player_cards()
+		_update_hand_count()
 		_update_draw_button()
+		_refresh_tray_toggle_copy()
 		return
 	var current_name := state.current_player_name()
-	turn_label.text = "YOUR TURN" if _is_local_turn() else "%s'S TURN" % current_name.to_upper()
-	var lines: Array[String] = []
-	for peer_id in state.player_order:
-		var marker := "▶ " if peer_id == state.current_player_id() else "  "
-		lines.append("%s%s — %d" % [
-			marker,
-			state.players.get(peer_id, "Player"),
-			int(state.player_scores.get(peer_id, 0))
-		])
-	players_label.text = "\n".join(lines)
+	turn_label.text = "★  YOUR TURN! GO GO GO!  ★" if _is_local_turn() else "▲  %s'S PICK!" % current_name.to_upper()
+	turn_panel.add_theme_stylebox_override("panel", GameHudScript.turn_style(_is_local_turn()))
 	total_score = int(state.player_scores.get(multiplayer.get_unique_id(), 0))
 	score_value_label.text = str(total_score)
+	_rebuild_player_cards()
+	_update_hand_count()
 	if not _is_local_turn():
 		board.clear_selection()
 		rotate_button.disabled = true
 	_update_draw_button()
+	_refresh_tray_toggle_copy()
+
+
+func _update_hand_count() -> void:
+	var local_peer_id := multiplayer.get_unique_id()
+	var remaining := _remaining_piece_count(local_peer_id)
+	hand_count_label.text = "%d TILE%s" % [remaining, "" if remaining == 1 else "S"]
+	_update_tray_layout(state.game_started)
+
+
+func _update_tray_layout(animate: bool = true) -> void:
+	var remaining := _remaining_piece_count(multiplayer.get_unique_id())
+	var available_width := tray_well.size.x - 16.0
+	if available_width < TRAY_TILE_SIZE.x:
+		available_width = maxf(420.0, size.x - 370.0)
+	var columns := maxi(1, int(floor((available_width + 8.0) / (TRAY_TILE_SIZE.x + 8.0))))
+	var rows := maxi(1, ceili(float(remaining) / float(columns)))
+	var rack_height := 118.0 + float(rows - 1) * HAND_TRAY_ROW_HEIGHT
+	tray_well.custom_minimum_size.y = rack_height
+	var maximum_height := maxf(HAND_TRAY_BASE_HEIGHT, size.y - 188.0)
+	hand_tray_height = minf(
+		HAND_TRAY_BASE_HEIGHT + float(rows - 1) * HAND_TRAY_ROW_HEIGHT,
+		maximum_height
+	)
+	_set_hand_tray_position(animate)
+
+
+func _remaining_piece_count(peer_id: int) -> int:
+	var tray_ids: Array = state.player_tray_piece_ids.get(peer_id, [])
+	var used_ids: Dictionary = state.used_piece_ids_by_player.get(peer_id, {})
+	return maxi(0, tray_ids.size() - used_ids.size())
+
+
+func _rebuild_player_cards() -> void:
+	for child in player_cards_container.get_children():
+		player_cards_container.remove_child(child)
+		child.queue_free()
+	if state.player_order.is_empty():
+		var empty_state := _hud_label("Invite some buddies to the table!  ★", 14, Color("#fff8df"))
+		player_cards_container.add_child(empty_state)
+		return
+
+	var local_peer_id := multiplayer.get_unique_id()
+	var available_width := get_viewport_rect().size.x - 36.0 - float(maxi(0, state.player_order.size() - 1) * 10)
+	var card_width := clampf(available_width / float(state.player_order.size()), 190.0, 292.0)
+	for peer_id in state.player_order:
+		var card_index := state.player_order.find(peer_id)
+		var is_active := peer_id == state.current_player_id() and state.game_started
+		var is_local := peer_id == local_peer_id
+		var card := PanelContainer.new()
+		card.custom_minimum_size = Vector2(card_width, 58)
+		card.add_theme_stylebox_override("panel", GameHudScript.player_card_style(card_index, is_active, is_local))
+		card.rotation_degrees = [-1.4, 1.1, -0.8, 1.5][card_index % 4]
+		card.pivot_offset = Vector2(card_width * 0.5, 29)
+		if is_active:
+			card.scale = Vector2(1.035, 1.035)
+		player_cards_container.add_child(card)
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 11)
+		margin.add_theme_constant_override("margin_top", 7)
+		margin.add_theme_constant_override("margin_right", 12)
+		margin.add_theme_constant_override("margin_bottom", 7)
+		card.add_child(margin)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 9)
+		margin.add_child(row)
+
+		var avatar := PanelContainer.new()
+		avatar.custom_minimum_size = Vector2(38, 38)
+		var avatar_style := StyleBoxFlat.new()
+		avatar_style.bg_color = Color("#fff8df")
+		avatar_style.border_color = Color("#3d315b")
+		avatar_style.set_border_width_all(2)
+		avatar_style.set_corner_radius_all(19)
+		avatar.add_theme_stylebox_override("panel", avatar_style)
+		row.add_child(avatar)
+		var player_name := str(state.players.get(peer_id, "Player"))
+		var avatar_label := _hud_label(player_name.left(1).to_upper(), 16, Color("#3d315b"))
+		avatar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		avatar_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		avatar.add_child(avatar_label)
+
+		var identity := VBoxContainer.new()
+		identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		identity.add_theme_constant_override("separation", 0)
+		row.add_child(identity)
+		var name_suffix := "  (ME!)" if is_local else ""
+		var name_label := _hud_label(player_name + name_suffix, 14, Color("#34294f"))
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		identity.add_child(name_label)
+		var meta_copy := "▲  × %d tile%s" % [_remaining_piece_count(peer_id), "" if _remaining_piece_count(peer_id) == 1 else "s"]
+		if is_active:
+			meta_copy = "★ PLAYING!  •  " + meta_copy
+		identity.add_child(_hud_label(meta_copy, 10, Color("#4a345a")))
+
+		var score_stack := VBoxContainer.new()
+		score_stack.add_theme_constant_override("separation", -2)
+		row.add_child(score_stack)
+		var score_number := _hud_label(str(int(state.player_scores.get(peer_id, 0))), 22, Color("#34294f"))
+		score_number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		score_stack.add_child(score_number)
+		var points_label := _hud_label("POINTS!", 8, Color("#5c4962"))
+		points_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		score_stack.add_child(points_label)
+
+
+func _hud_label(copy: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = copy
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	return label
 
 
 func _refresh_lobby_ui() -> void:
