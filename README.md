@@ -25,64 +25,11 @@ An early desktop prototype of the triangular tile game, built with Godot 4.
 - Any additional corner that touches another corner must show the same number.
 - Green edges accept the selected rotation; red edges reject it.
 - Each player has a synchronized score, and the sidebar shows the current turn.
-- For win-flow testing, an accepted placement that takes a player's score over
-  10 currently declares that player the winner and opens a synchronized window.
 - Lobby player rows track wins until that player leaves the current lobby.
 - Scoring includes tile values, bridges, and single/double/triple hexagon bonuses.
 - The base tile-value formula remains a user-editable hook.
 - Reset starts a fresh board and returns every piece to the tray.
 
-## Scoring
-
-Every legal move earns the sum of its three numbers. Special shapes then add:
-
-- Bridge: **+40** points.
-- One completed hexagon: **+50** points.
-- Two hexagons completed by one tile: **+60** points.
-- Three hexagons completed by one tile: **+70** points.
-
-The board detects these from the corners surrounding the new tile before the
-host commits the move. A hexagon completion does not also receive a bridge bonus.
-
-To customize the base value, edit `tile_value()` in `scripts/scoring.gd`. It
-receives the three numbers from the piece being placed:
-
-```gdscript
-func tile_value(piece_numbers: Array[int]) -> int:
-	var points := 0
-	for number in piece_numbers:
-		points += number
-	return points
-```
-
-The returned number becomes the tile-value part of the scoring breakdown; shape
-bonuses are added automatically by `placement_score()`.
-
-## Temporary win-flow test
-
-The host-authoritative `declare_winner(peer_id)` function in `scripts/main.gd`
-increments the winner's lobby win count, synchronizes it to every player, ends
-the round, and opens a winner window. Each player then chooses **Continue to
-lobby**. It is temporarily called after every accepted placement so the whole
-win flow is easy to test. It is currently called when the player's round score
-becomes greater than 10. Starting another round preserves the lobby totals;
-leaving the lobby clears them.
-
-## Project structure
-
-```text
-triomino/
-|-- assets/        # Future artwork, audio, and fonts
-|-- scenes/        # Godot scene files
-|-- scripts/       # Small game, board, network, and UI modules
-|-- tests/         # Automated rule, UI, and multiplayer checks
-|-- GAME_ARCHITECTURE.md # File responsibilities and change guide
-|-- project.godot  # Godot project settings
-`-- README.md
-```
-
-See [`GAME_ARCHITECTURE.md`](GAME_ARCHITECTURE.md) for a beginner-friendly map
-of the refactored code and where future features should be added.
 
 ## Run locally
 
@@ -116,9 +63,3 @@ central relay server.
   computer. Some carrier-grade NAT connections cannot accept forwarded ports.
 - A future hosted relay/matchmaking service would remove the port-forwarding
   requirement and make codes work from almost any network.
-
-## Automated checks
-
-The `tests/` directory includes unit checks for lobby codes and existing game
-rules, plus a two-process smoke test that verifies hosting, joining, display-name
-sync, round start, moves in both directions, turn changes, and scores.
