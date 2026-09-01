@@ -224,7 +224,7 @@ static func build(root: Control, board: Control) -> Dictionary:
 	tray_padding.add_child(tray)
 
 	var action_column := VBoxContainer.new()
-	action_column.custom_minimum_size = Vector2(300, 0)
+	action_column.custom_minimum_size = Vector2(330, 0)
 	action_column.add_theme_constant_override("separation", 8)
 	body.add_child(action_column)
 	var status_panel := PanelContainer.new()
@@ -259,6 +259,13 @@ static func build(root: Control, board: Control) -> Dictionary:
 	draw_button.text = "+  Draw tile"
 	_style_button(draw_button, Color("#67d5c0"), INK)
 	controls.add_child(draw_button)
+	var pass_turn_button := Button.new()
+	pass_turn_button.custom_minimum_size = Vector2(0, 40)
+	pass_turn_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pass_turn_button.text = "→  Pass turn"
+	pass_turn_button.tooltip_text = "End your turn without placing a tile"
+	_style_button(pass_turn_button, Color("#ff9d9d"), INK)
+	controls.add_child(pass_turn_button)
 	var draw_count := _label("0 / 3", 10, CREAM)
 	draw_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	controls.add_child(draw_count)
@@ -276,6 +283,7 @@ static func build(root: Control, board: Control) -> Dictionary:
 		"instructions": instructions,
 		"rotate_button": rotate_button,
 		"draw_button": draw_button,
+		"pass_turn_button": pass_turn_button,
 		"draw_count": draw_count,
 		"board_count": board_count,
 		"hand_count": hand_count,

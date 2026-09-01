@@ -57,9 +57,15 @@ func apply_placement(peer_id: int, piece_id: int, scores: Dictionary, next_turn:
 		return false
 	mark_piece_used(peer_id, piece_id)
 	player_scores = scores.duplicate()
-	current_turn_index = next_turn
+	begin_turn(next_turn)
 	return true
-	
+
+
+func begin_turn(turn_index: int) -> void:
+	current_turn_index = turn_index
+	player_current_turn_draws = 0
+
+
 func add_piece_to_tray(peer_id: int, piece_id: int) -> void:
 	var tray_ids: Array = player_tray_piece_ids.get(peer_id, [])
 	if not tray_ids.has(piece_id):

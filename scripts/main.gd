@@ -1,5 +1,7 @@
 extends Control
 
+signal pass_turn_requested
+
 const PieceScene := preload("res://scripts/triomino_piece.gd")
 const LobbyCodeScript := preload("res://scripts/lobby_code.gd")
 const PieceCatalogScript := preload("res://scripts/piece_catalog.gd")
@@ -47,6 +49,7 @@ var zoom_out_button: Button
 var zoom_in_button: Button
 var center_view_button: Button
 var zoom_label: Label
+var pass_turn_button: Button
 
 @onready var lobby_overlay: Control = $LobbyOverlay
 @onready var lobby_status_label: Label = $LobbyOverlay/Center/Panel/Margin/Content/Status
@@ -102,6 +105,7 @@ func _install_modern_hud() -> void:
 	instructions_label = hud.instructions
 	rotate_button = hud.rotate_button
 	draw_from_well_button = hud.draw_button
+	pass_turn_button = hud.pass_turn_button
 	draw_count_label = hud.draw_count
 	piece_count_label = hud.board_count
 	hand_count_label = hud.hand_count
@@ -130,6 +134,7 @@ func _connect_ui_signals() -> void:
 	zoom_in_button.pressed.connect(board.zoom_in)
 	center_view_button.pressed.connect(board.reset_view)
 	draw_from_well_button.pressed.connect(_draw_from_well)
+	pass_turn_button.pressed.connect(_on_pass_turn_pressed)
 	tray_toggle_button.pressed.connect(_toggle_hand_tray)
 	host_button.pressed.connect(_host_lobby)
 	join_button.pressed.connect(_join_lobby)
@@ -141,6 +146,7 @@ func _connect_ui_signals() -> void:
 
 
 func _connect_network_signals() -> void:
+	pass_turn_requested.connect(network.send_pass_turn_request)
 	network.connection_succeeded.connect(_on_connected_to_server)
 	network.connection_failed_event.connect(_on_connection_failed)
 	network.server_disconnected_event.connect(_on_server_disconnected)
@@ -155,6 +161,7 @@ func _connect_network_signals() -> void:
 	network.winner_received.connect(_apply_winner)
 	network.player_state_received.connect(_apply_player_state)
 	network.draw_from_well_requested.connect(_process_draw_from_well_requested)
+	network.pass_turn_requested.connect(_process_pass_turn_requested)
 	network.piece_drawn_received.connect(_apply_piece_drawn)
 
 func _build_piece_tray() -> void:
@@ -207,11 +214,28 @@ func _rotate_selected_piece() -> void:
 func _draw_from_well() -> void:
 	if not state.game_started or not _is_local_turn():
 		return
-	if state.player_current_turn_draws == 3:
+	if state.player_current_turn_draws >= 3:
 		return
 	draw_from_well_button.disabled = true
 	network.send_draw_from_well_request()
 	status_label.text = "Checking move…"
+
+
+func _on_pass_turn_pressed() -> void:
+	if not state.game_started or not _is_local_turn():
+		return
+	pass_turn_button.disabled = true
+	status_label.text = "Passing your turn…"
+	pass_turn_requested.emit()
+
+
+func _process_pass_turn_requested(peer_id: int) -> void:
+	if not state.game_started or not _is_local_turn():
+		return
+	var next_turn := (state.current_turn_index + 1) % state.player_order.size()
+	state.begin_turn(next_turn)
+	pass
+
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -452,8 +476,9 @@ func _process_draw_from_well_requested(
 	if piece_id < 0:
 		network.reject_move_for(peer_id, "The piece well is empty.")
 		return
-	if state.player_current_turn_draws == 3:
+	if state.player_current_turn_draws >= 3:
 		network.reject_move_for(peer_id, "The player can't draw anymore from the well this turn.")
+		return
 	network.broadcast_piece_drawn(peer_id, piece_id, dealer.piece_well.size())
 
 
@@ -709,6 +734,7 @@ func _update_draw_button() -> void:
 		or state.player_current_turn_draws >= 3
 	)
 	draw_from_well_button.tooltip_text = "%d mystery tiles remaining" % state.well_piece_count
+	pass_turn_button.disabled = not state.game_started or not _is_local_turn() or state.player_current_turn_draws < 3
 	well_count_label.text = "MYSTERY PILE  %d" % state.well_piece_count
 	draw_count_label.text = "%d / 3" % state.player_current_turn_draws
 
