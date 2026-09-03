@@ -11,12 +11,18 @@ An early desktop prototype of the triangular tile game, built with Godot 4.
   dealt the next tiles in sequence: 9 each for two players, or 7 each for three
   or four players. No physical tile is repeated between players.
 - Using a tile removes only that player's copy from their tray.
-- On their turn, a player can draw one synchronized piece from the host's well
-  and then continue their turn.
+- On their turn, a player can draw up to three synchronized pieces from the
+  host's well. After the third draw, the host automatically passes the turn
+  only when none of that player's unused pieces fits the board in any rotation,
+  applying the full 25-point unsuccessful-draw penalty.
 - The host validates placements and keeps the board, used pieces, turns, and scores in sync.
 - The deal is drawn from the complete 56-piece set using every unique combination from 0 through 5.
 - Three-distinct-number tiles use the official clockwise ascending order; mirrored tiles are excluded.
 - All tray pieces already show their three numbers.
+- The board remains the dominant play surface while every tile in the local
+  hand stays visible in one responsive, non-scrolling rack.
+- Accepted draws, placements, score changes, automatic passes, and turn changes
+  use synchronized cartoon-style visual feedback on every peer.
 - Select any available piece from the tray.
 - Rotate the selected piece clockwise with the **Rotate piece** button or the **R** key.
 - The first piece is always placed at the exact center of the board.

@@ -82,10 +82,10 @@ func zoom_out() -> void:
 
 
 func reset_view() -> void:
-	_view_zoom = 1.0
+	#_view_zoom = 1.0
 	_view_offset = Vector2.ZERO
 	_apply_view_transform()
-	view_changed.emit(100)
+	view_changed.emit(get_zoom_percent())
 	queue_redraw()
 
 
@@ -287,6 +287,24 @@ func _candidate_is_legal(candidate: Dictionary, candidate_numbers: Array[int]) -
 	return true
 
 
+func can_place_numbers_anywhere(piece_numbers: Array[int]) -> bool:
+	if piece_numbers.size() != 3:
+		return false
+	if placed_pieces.is_empty():
+		return true
+	var rotated_numbers: Array[int] = piece_numbers.duplicate()
+	for number_rotation in 3:
+		for placed in placed_pieces:
+			for edge_index in 3:
+				var candidate := _candidate_across_edge(placed, edge_index)
+				if not _position_is_free(candidate.center):
+					continue
+				if _candidate_is_legal(candidate, rotated_numbers):
+					return true
+		rotated_numbers = [rotated_numbers[1], rotated_numbers[2], rotated_numbers[0]]
+	return false
+
+
 func is_network_placement_legal(center_offset: Vector2, rotation: float, numbers: Array[int]) -> bool:
 	var requested_center := size * 0.5 + center_offset
 	if placed_pieces.is_empty():
@@ -359,6 +377,16 @@ func _place_piece(piece_id: int, numbers: Array[int], candidate: Dictionary) -> 
 	piece.size = TILE_BOX
 	piece.configure(piece_id, numbers, TILE_SIDE, candidate.rotation)
 	add_child(piece)
+	if piece.is_inside_tree():
+		piece.pivot_offset = piece.size * 0.5
+		piece.scale = Vector2(0.28, 0.28)
+		piece.rotation_degrees = -12.0 if piece_id % 2 == 0 else 12.0
+		piece.modulate.a = 0.0
+		var drop_tween := piece.create_tween().set_parallel(true)
+		drop_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		drop_tween.tween_property(piece, "scale", Vector2.ONE, 0.42)
+		drop_tween.tween_property(piece, "rotation_degrees", 0.0, 0.42)
+		drop_tween.tween_property(piece, "modulate:a", 1.0, 0.24)
 
 	placed_pieces.append({
 		"node": piece,

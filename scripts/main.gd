@@ -8,11 +8,14 @@ const ScoringScript := preload("res://scripts/scoring.gd")
 const GameStateScript := preload("res://scripts/game_state.gd")
 const GameHudScript := preload("res://scripts/game_hud.gd")
 
-const TRAY_TILE_SIZE := Vector2(116.0, 106.0)
-const TRAY_TILE_SIDE := 82.0
-const HAND_TRAY_BASE_HEIGHT := 218.0
-const HAND_TRAY_ROW_HEIGHT := 114.0
-const HAND_TRAY_COLLAPSED_HEIGHT := 58.0
+const TRAY_TILE_SIZE := Vector2(94.0, 86.0)
+const TRAY_TILE_SIDE := 66.0
+const TRAY_TILE_MAX_WIDTH := 100.0
+const TRAY_TILE_MIN_WIDTH := 44.0
+const TRAY_TILE_ASPECT := 106.0 / 116.0
+const TRAY_TILE_SIDE_RATIO := 82.0 / 116.0
+const HAND_TRAY_BASE_HEIGHT := 148.0
+const HAND_TRAY_COLLAPSED_HEIGHT := 44.0
 const MAX_PIECE_NUMBER := 5
 const GAME_PORT := 28745
 const MAX_PLAYERS := 4
@@ -35,6 +38,10 @@ var player_cards_container: HBoxContainer
 var hand_count_label: Label
 var well_count_label: Label
 var hand_panel: PanelContainer
+var action_dock: MarginContainer
+var event_banner: PanelContainer
+var event_icon_label: Label
+var game_fx_layer: Control
 var tray_toggle_button: Button
 var tray_well: PanelContainer
 var board_area: MarginContainer
@@ -47,6 +54,10 @@ var zoom_out_button: Button
 var zoom_in_button: Button
 var center_view_button: Button
 var zoom_label: Label
+var game_event_queue: Array[Dictionary] = []
+var game_event_active := false
+var score_animation: Tween
+var turn_animation: Tween
 
 @onready var lobby_overlay: Control = $LobbyOverlay
 @onready var lobby_status_label: Label = $LobbyOverlay/Center/Panel/Margin/Content/Status
@@ -109,6 +120,10 @@ func _install_modern_hud() -> void:
 	reset_button = hud.reset_button
 	fullscreen_button = hud.fullscreen_button
 	hand_panel = hud.hand_panel
+	action_dock = hud.action_dock
+	event_banner = hud.event_banner
+	event_icon_label = hud.event_icon
+	game_fx_layer = hud.fx_layer
 	tray_toggle_button = hud.tray_toggle
 	tray_well = hud.tray_well
 	board_area = hud.board_area
@@ -155,6 +170,7 @@ func _connect_network_signals() -> void:
 	network.winner_received.connect(_apply_winner)
 	network.player_state_received.connect(_apply_player_state)
 	network.draw_from_well_requested.connect(_process_draw_from_well_requested)
+	network.turn_passed_received.connect(_apply_turn_passed)
 	network.piece_drawn_received.connect(_apply_piece_drawn)
 
 func _build_piece_tray() -> void:
@@ -207,11 +223,39 @@ func _rotate_selected_piece() -> void:
 func _draw_from_well() -> void:
 	if not state.game_started or not _is_local_turn():
 		return
-	if state.player_current_turn_draws == 3:
+	if state.player_current_turn_draws >= 3:
 		return
 	draw_from_well_button.disabled = true
 	network.send_draw_from_well_request()
 	status_label.text = "Checking move…"
+
+
+func _apply_turn_passed(
+	peer_id: int,
+	next_turn: int,
+	updated_scores: Dictionary,
+	penalty_points: int
+) -> void:
+	var previous_local_score := int(state.player_scores.get(multiplayer.get_unique_id(), 0))
+	state.apply_turn_pass(updated_scores, next_turn)
+	board.clear_selection()
+	if selected_tray_piece != null:
+		selected_tray_piece.set_selected(false)
+	selected_tray_piece = null
+	rotate_button.disabled = true
+	var player_name: String = state.players.get(peer_id, "A player")
+	status_label.text = "%s had no playable tiles and lost %d points." % [player_name, penalty_points]
+	instructions_label.text = "%s is up next." % state.current_player_name()
+	_update_game_ui()
+	_queue_game_event(
+		"↷",
+		"NO MATCH FOR %s" % player_name.to_upper(),
+		"Automatic pass  •  -%d points  •  %s is up" % [penalty_points, state.current_player_name()],
+		Color("#ee6572")
+	)
+	_animate_score_change(previous_local_score, int(state.player_scores.get(multiplayer.get_unique_id(), 0)))
+	_animate_turn_change()
+
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -255,7 +299,9 @@ func _set_hand_tray_position(animate: bool) -> void:
 		hand_tray_tween.kill()
 	var target_top := -hand_tray_height if hand_tray_open else -HAND_TRAY_COLLAPSED_HEIGHT
 	var target_bottom := 0.0 if hand_tray_open else hand_tray_height - HAND_TRAY_COLLAPSED_HEIGHT
-	var board_target_bottom := -(hand_tray_height - 54.0) if hand_tray_open else 0.0
+	var board_target_bottom := -(hand_tray_height - HAND_TRAY_COLLAPSED_HEIGHT) if hand_tray_open else 0.0
+	var action_target_bottom := target_top - 8.0
+	var action_target_top := action_target_bottom - 50.0
 	if animate:
 		hand_tray_tween = create_tween()
 		hand_tray_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -263,10 +309,14 @@ func _set_hand_tray_position(animate: bool) -> void:
 		hand_tray_tween.tween_property(hand_panel, "offset_top", target_top, 0.38)
 		hand_tray_tween.tween_property(hand_panel, "offset_bottom", target_bottom, 0.38)
 		hand_tray_tween.tween_property(board_area, "offset_bottom", board_target_bottom, 0.38)
+		hand_tray_tween.tween_property(action_dock, "offset_top", action_target_top, 0.38)
+		hand_tray_tween.tween_property(action_dock, "offset_bottom", action_target_bottom, 0.38)
 	else:
 		hand_panel.offset_top = target_top
 		hand_panel.offset_bottom = target_bottom
 		board_area.offset_bottom = board_target_bottom
+		action_dock.offset_top = action_target_top
+		action_dock.offset_bottom = action_target_bottom
 	_refresh_tray_toggle_copy()
 
 
@@ -426,6 +476,8 @@ func _apply_round_started(
 	_reset_board_and_tray()
 	_set_game_controls_enabled(true)
 	_update_game_ui()
+	_queue_game_event("★", "ROUND START!", "%s gets the first move." % state.current_player_name(), Color("#ffd34e"))
+	_animate_turn_change()
 
 
 func _on_board_placement_requested(
@@ -445,6 +497,9 @@ func _process_draw_from_well_requested(
 	if not state.game_started or peer_id != state.current_player_id():
 		network.reject_move_for(peer_id, "It is not your turn.")
 		return
+	if state.player_current_turn_draws >= 3:
+		network.reject_move_for(peer_id, "The player can't draw anymore from the well this turn.")
+		return
 	if not dealer.has_pieces_in_well():
 		network.reject_move_for(peer_id, "The piece well is empty.")
 		return
@@ -452,9 +507,18 @@ func _process_draw_from_well_requested(
 	if piece_id < 0:
 		network.reject_move_for(peer_id, "The piece well is empty.")
 		return
-	if state.player_current_turn_draws == 3:
-		network.reject_move_for(peer_id, "The player can't draw anymore from the well this turn.")
+	var next_draw_count := state.player_current_turn_draws + 1
+	var should_auto_pass := (
+		next_draw_count == 3
+		and not _player_has_playable_piece(peer_id, piece_id)
+	)
 	network.broadcast_piece_drawn(peer_id, piece_id, dealer.piece_well.size())
+	if should_auto_pass:
+		var next_turn := (state.current_turn_index + 1) % state.player_order.size()
+		var penalty_points := scoring.draw_penalty(next_draw_count)
+		var updated_scores := state.player_scores.duplicate()
+		updated_scores[peer_id] = int(updated_scores.get(peer_id, 0)) - penalty_points
+		network.broadcast_turn_passed(peer_id, next_turn, updated_scores, penalty_points)
 
 
 func _apply_piece_drawn(peer_id: int, piece_id: int, well_piece_count: int) -> void:
@@ -473,6 +537,13 @@ func _apply_piece_drawn(peer_id: int, piece_id: int, well_piece_count: int) -> v
 		instructions_label.text = "%s is still choosing a piece." % player_name
 	draw_count_label.text = "%d / 3" % state.player_current_turn_draws
 	_update_game_ui()
+	_queue_game_event(
+		"◆",
+		"%s DREW A TILE" % player_name.to_upper(),
+		"Mystery draw %d of 3  •  %d left in the well" % [state.player_current_turn_draws, well_piece_count],
+		Color("#67d5c0")
+	)
+	_animate_draw.call_deferred(peer_id, piece_id)
 
 func _process_play_request(
 	peer_id: int,
@@ -520,6 +591,7 @@ func _process_play_request(
 func _on_move_rejected(reason: String) -> void:
 	status_label.text = "Oopsie! Try another move"
 	instructions_label.text = reason
+	_queue_game_event("×", "BONK! THAT DOESN'T FIT", reason, Color("#ee6572"))
 	_update_draw_button()
 
 
@@ -533,6 +605,7 @@ func _apply_placement(
 	updated_scores: Dictionary,
 	next_turn: int
 ) -> void:
+	var previous_local_score := int(state.player_scores.get(multiplayer.get_unique_id(), 0))
 	if not state.apply_placement(peer_id, piece_id, updated_scores, next_turn):
 		return
 	board.commit_network_piece(piece_id, numbers, center_offset, rotation)
@@ -562,6 +635,18 @@ func _apply_placement(
 		declare_winner(local_peer_id)
 
 	_update_game_ui()
+	_queue_game_event(
+		"▲",
+		"%s PLAYS!  %s%d" % [
+			player_name.to_upper(),
+			"+" if int(score_breakdown.total) >= 0 else "",
+			int(score_breakdown.total),
+		],
+		instructions_label.text,
+		Color("#ffd34e") if int(score_breakdown.total) >= 0 else Color("#ee6572")
+	)
+	_animate_score_change(previous_local_score, int(state.player_scores.get(local_peer_id, 0)))
+	_animate_turn_change()
 
 
 func declare_winner(winner_peer_id: int) -> void:
@@ -686,6 +771,7 @@ func _set_game_controls_enabled(enabled: bool) -> void:
 		piece.set_available(enabled and belongs_to_local_tray and not was_used)
 	_sync_tray_order()
 	rotate_button.disabled = true
+	_refresh_tray_playability()
 	_update_draw_button()
 
 
@@ -699,6 +785,37 @@ func _sync_tray_order() -> void:
 		var piece: TriominoPiece = tray_pieces[piece_id]
 		piece_tray.move_child(piece, target_index)
 		target_index += 1
+
+
+func _refresh_tray_playability() -> void:
+	var local_peer_id := multiplayer.get_unique_id()
+	for piece_id in tray_pieces:
+		var piece: TriominoPiece = tray_pieces[piece_id]
+		var should_show := (
+			state.game_started
+			and state.has_tray_piece(local_peer_id, piece_id)
+			and not state.has_used_piece(local_peer_id, piece_id)
+		)
+		var is_playable := false
+		if should_show:
+			var base_numbers := PieceCatalogScript.typed_numbers(piece_definitions[piece_id])
+			is_playable = board.can_place_numbers_anywhere(base_numbers)
+		piece.set_playability_indicator(should_show, is_playable)
+
+
+func _player_has_playable_piece(peer_id: int, additional_piece_id: int = -1) -> bool:
+	var tray_piece_ids: Array = state.player_tray_piece_ids.get(peer_id, [])
+	for piece_id in tray_piece_ids:
+		if state.has_used_piece(peer_id, piece_id):
+			continue
+		var numbers := PieceCatalogScript.typed_numbers(piece_definitions[piece_id])
+		if board.can_place_numbers_anywhere(numbers):
+			return true
+	if additional_piece_id >= 0 and not tray_piece_ids.has(additional_piece_id):
+		var additional_numbers := PieceCatalogScript.typed_numbers(piece_definitions[additional_piece_id])
+		if board.can_place_numbers_anywhere(additional_numbers):
+			return true
+	return false
 
 
 func _update_draw_button() -> void:
@@ -720,6 +837,7 @@ func _update_game_ui() -> void:
 		score_value_label.text = "0"
 		_rebuild_player_cards()
 		_update_hand_count()
+		_refresh_tray_playability()
 		_update_draw_button()
 		_refresh_tray_toggle_copy()
 		return
@@ -730,11 +848,146 @@ func _update_game_ui() -> void:
 	score_value_label.text = str(total_score)
 	_rebuild_player_cards()
 	_update_hand_count()
+	_refresh_tray_playability()
 	if not _is_local_turn():
 		board.clear_selection()
 		rotate_button.disabled = true
 	_update_draw_button()
 	_refresh_tray_toggle_copy()
+
+
+func _queue_game_event(icon: String, title: String, detail: String, accent: Color) -> void:
+	game_event_queue.append({
+		"icon": icon,
+		"title": title,
+		"detail": detail,
+		"accent": accent,
+	})
+	if not game_event_active:
+		_play_next_game_event.call_deferred()
+
+
+func _play_next_game_event() -> void:
+	if game_event_active or game_event_queue.is_empty() or not is_inside_tree():
+		return
+	game_event_active = true
+	var game_event: Dictionary = game_event_queue.pop_front()
+	event_icon_label.text = str(game_event.icon)
+	status_label.text = str(game_event.title)
+	instructions_label.text = str(game_event.detail)
+	event_banner.add_theme_stylebox_override("panel", GameHudScript.event_style(game_event.accent))
+	event_banner.pivot_offset = event_banner.size * 0.5
+	event_banner.scale = Vector2(0.78, 0.78)
+	event_banner.modulate.a = 0.0
+	event_icon_label.rotation_degrees = -18.0
+	var banner_tween := create_tween().set_parallel(true)
+	banner_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	banner_tween.tween_property(event_banner, "scale", Vector2.ONE, 0.3)
+	banner_tween.tween_property(event_banner, "modulate:a", 1.0, 0.18)
+	banner_tween.tween_property(event_icon_label, "rotation_degrees", 0.0, 0.34)
+	banner_tween.chain().tween_interval(0.62)
+	await banner_tween.finished
+	game_event_active = false
+	if not game_event_queue.is_empty():
+		_play_next_game_event.call_deferred()
+
+
+func _animate_draw(peer_id: int, piece_id: int) -> void:
+	if not is_inside_tree() or not game_fx_layer or not well_count_label:
+		return
+	var target_control: Control = _player_card_for_peer(peer_id)
+	if peer_id == multiplayer.get_unique_id() and tray_pieces.has(piece_id):
+		var local_piece: TriominoPiece = tray_pieces[piece_id]
+		if local_piece.visible:
+			target_control = local_piece
+			local_piece.pivot_offset = local_piece.size * 0.5
+			local_piece.scale = Vector2(0.68, 0.68)
+			local_piece.modulate.a = 0.25
+			var reveal_tween := local_piece.create_tween().set_parallel(true)
+			reveal_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			reveal_tween.tween_interval(0.28)
+			reveal_tween.tween_property(local_piece, "scale", Vector2.ONE, 0.36).set_delay(0.28)
+			reveal_tween.tween_property(local_piece, "modulate:a", 1.0, 0.2).set_delay(0.28)
+	if target_control == null:
+		return
+	var source := _control_center_in_fx(well_count_label)
+	var target := _control_center_in_fx(target_control)
+	var flight_token := Label.new()
+	flight_token.text = "◆"
+	flight_token.size = Vector2(54, 54)
+	flight_token.position = source - flight_token.size * 0.5
+	flight_token.pivot_offset = flight_token.size * 0.5
+	flight_token.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	flight_token.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	flight_token.add_theme_font_size_override("font_size", 40)
+	flight_token.add_theme_color_override("font_color", Color("#67d5c0"))
+	flight_token.add_theme_color_override("font_outline_color", Color("#34294f"))
+	flight_token.add_theme_constant_override("outline_size", 7)
+	flight_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	game_fx_layer.add_child(flight_token)
+	var arc_peak := source.lerp(target, 0.48) + Vector2(0, -72)
+	var flight_tween := flight_token.create_tween()
+	flight_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	flight_tween.tween_property(flight_token, "position", arc_peak - flight_token.size * 0.5, 0.28)
+	flight_tween.parallel().tween_property(flight_token, "rotation_degrees", 150.0, 0.28)
+	flight_tween.parallel().tween_property(flight_token, "scale", Vector2(1.22, 1.22), 0.28)
+	flight_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	flight_tween.tween_property(flight_token, "position", target - flight_token.size * 0.5, 0.32)
+	flight_tween.parallel().tween_property(flight_token, "rotation_degrees", 300.0, 0.32)
+	flight_tween.parallel().tween_property(flight_token, "scale", Vector2(0.45, 0.45), 0.32)
+	flight_tween.tween_callback(flight_token.queue_free)
+	_punch_control(well_count_label)
+
+
+func _control_center_in_fx(control: Control) -> Vector2:
+	var global_center := control.get_global_rect().get_center()
+	return game_fx_layer.get_global_transform_with_canvas().affine_inverse() * global_center
+
+
+func _player_card_for_peer(peer_id: int) -> Control:
+	for child in player_cards_container.get_children():
+		if child is Control and child.get_meta("peer_id", -1) == peer_id:
+			return child
+	return null
+
+
+func _animate_score_change(previous_score: int, new_score: int) -> void:
+	if previous_score == new_score:
+		return
+	if score_animation != null and score_animation.is_valid():
+		score_animation.kill()
+	score_value_label.pivot_offset = score_value_label.size * 0.5
+	score_value_label.scale = Vector2(1.38, 1.38)
+	score_value_label.add_theme_color_override(
+		"font_color",
+		Color("#67d5c0") if new_score > previous_score else Color("#ff8c8c")
+	)
+	score_animation = create_tween()
+	score_animation.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	score_animation.tween_property(score_value_label, "scale", Vector2.ONE, 0.42)
+	score_animation.tween_callback(
+		func() -> void: score_value_label.add_theme_color_override("font_color", Color("#ffd34e"))
+	)
+
+
+func _animate_turn_change() -> void:
+	if turn_animation != null and turn_animation.is_valid():
+		turn_animation.kill()
+	turn_panel.pivot_offset = turn_panel.size * 0.5
+	turn_panel.scale = Vector2(0.78, 0.78)
+	turn_panel.modulate.a = 0.45
+	turn_animation = create_tween().set_parallel(true)
+	turn_animation.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	turn_animation.tween_property(turn_panel, "scale", Vector2.ONE, 0.38)
+	turn_animation.tween_property(turn_panel, "modulate:a", 1.0, 0.2)
+
+
+func _punch_control(control: Control) -> void:
+	control.pivot_offset = control.size * 0.5
+	control.scale = Vector2(1.18, 1.18)
+	var punch_tween := control.create_tween()
+	punch_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	punch_tween.tween_property(control, "scale", Vector2.ONE, 0.32)
 
 
 func _update_hand_count() -> void:
@@ -745,19 +998,27 @@ func _update_hand_count() -> void:
 
 
 func _update_tray_layout(animate: bool = true) -> void:
-	var remaining := _remaining_piece_count(multiplayer.get_unique_id())
+	var local_peer_id := multiplayer.get_unique_id()
+	var visible_piece_ids: Array[int] = []
+	for piece_id in state.player_tray_piece_ids.get(local_peer_id, []):
+		if not state.has_used_piece(local_peer_id, piece_id):
+			visible_piece_ids.append(piece_id)
 	var available_width := tray_well.size.x - 16.0
-	if available_width < TRAY_TILE_SIZE.x:
-		available_width = maxf(420.0, size.x - 370.0)
-	var columns := maxi(1, int(floor((available_width + 8.0) / (TRAY_TILE_SIZE.x + 8.0))))
-	var rows := maxi(1, ceili(float(remaining) / float(columns)))
-	var rack_height := 118.0 + float(rows - 1) * HAND_TRAY_ROW_HEIGHT
-	tray_well.custom_minimum_size.y = rack_height
-	var maximum_height := maxf(HAND_TRAY_BASE_HEIGHT, size.y - 188.0)
-	hand_tray_height = minf(
-		HAND_TRAY_BASE_HEIGHT + float(rows - 1) * HAND_TRAY_ROW_HEIGHT,
-		maximum_height
-	)
+	if available_width <= 32.0:
+		available_width = size.x - 40.0
+	var tile_width := TRAY_TILE_MAX_WIDTH
+	if not visible_piece_ids.is_empty():
+		tile_width = floor(
+			(available_width - float(maxi(0, visible_piece_ids.size() - 1) * 6))
+			/ float(visible_piece_ids.size())
+		)
+	tile_width = clampf(tile_width, TRAY_TILE_MIN_WIDTH, TRAY_TILE_MAX_WIDTH)
+	var tile_size := Vector2(tile_width, tile_width * TRAY_TILE_ASPECT)
+	for piece_id in visible_piece_ids:
+		var piece: TriominoPiece = tray_pieces[piece_id]
+		piece.set_display_size(tile_size, tile_width * TRAY_TILE_SIDE_RATIO)
+	tray_well.custom_minimum_size.y = tile_size.y + 8.0
+	hand_tray_height = maxf(102.0, 54.0 + tile_size.y)
 	_set_hand_tray_position(animate)
 
 
@@ -784,30 +1045,31 @@ func _rebuild_player_cards() -> void:
 		var is_active := peer_id == state.current_player_id() and state.game_started
 		var is_local := peer_id == local_peer_id
 		var card := PanelContainer.new()
-		card.custom_minimum_size = Vector2(card_width, 58)
+		card.set_meta("peer_id", peer_id)
+		card.custom_minimum_size = Vector2(card_width, 48)
 		card.add_theme_stylebox_override("panel", GameHudScript.player_card_style(card_index, is_active, is_local))
 		card.rotation_degrees = [-1.4, 1.1, -0.8, 1.5][card_index % 4]
-		card.pivot_offset = Vector2(card_width * 0.5, 29)
+		card.pivot_offset = Vector2(card_width * 0.5, 24)
 		if is_active:
 			card.scale = Vector2(1.035, 1.035)
 		player_cards_container.add_child(card)
 		var margin := MarginContainer.new()
 		margin.add_theme_constant_override("margin_left", 11)
-		margin.add_theme_constant_override("margin_top", 7)
+		margin.add_theme_constant_override("margin_top", 4)
 		margin.add_theme_constant_override("margin_right", 12)
-		margin.add_theme_constant_override("margin_bottom", 7)
+		margin.add_theme_constant_override("margin_bottom", 4)
 		card.add_child(margin)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 9)
 		margin.add_child(row)
 
 		var avatar := PanelContainer.new()
-		avatar.custom_minimum_size = Vector2(38, 38)
+		avatar.custom_minimum_size = Vector2(32, 32)
 		var avatar_style := StyleBoxFlat.new()
 		avatar_style.bg_color = Color("#fff8df")
 		avatar_style.border_color = Color("#3d315b")
 		avatar_style.set_border_width_all(2)
-		avatar_style.set_corner_radius_all(19)
+		avatar_style.set_corner_radius_all(16)
 		avatar.add_theme_stylebox_override("panel", avatar_style)
 		row.add_child(avatar)
 		var player_name := str(state.players.get(peer_id, "Player"))

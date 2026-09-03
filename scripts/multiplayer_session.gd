@@ -17,6 +17,12 @@ signal round_started_received(
 signal play_requested(peer_id: int, piece_id: int, numbers: Array[int], center_offset: Vector2, rotation: float)
 signal move_rejected(reason: String)
 signal draw_from_well_requested(peer_id: int)
+signal turn_passed_received(
+	peer_id: int,
+	next_turn: int,
+	scores: Dictionary,
+	penalty_points: int
+)
 signal piece_drawn_received(peer_id: int, piece_id: int, well_piece_count: int)
 signal placement_received(
 	peer_id: int,
@@ -103,6 +109,15 @@ func send_draw_from_well_request() -> void:
 		_request_draw_from_well.rpc_id(1)
 
 
+func broadcast_turn_passed(
+	peer_id: int,
+	next_turn: int,
+	scores: Dictionary,
+	penalty_points: int
+) -> void:
+	_sync_turn_passed.rpc(peer_id, next_turn, scores, penalty_points)
+
+
 func broadcast_piece_drawn(peer_id: int, piece_id: int, well_piece_count: int) -> void:
 	_sync_piece_drawn.rpc(peer_id, piece_id, well_piece_count)
 
@@ -185,6 +200,16 @@ func _request_play(piece_id: int, numbers: Array[int], center_offset: Vector2, r
 func _request_draw_from_well() -> void:
 	if multiplayer.is_server():
 		draw_from_well_requested.emit(multiplayer.get_remote_sender_id())
+
+
+@rpc("authority", "call_local", "reliable")
+func _sync_turn_passed(
+	peer_id: int,
+	next_turn: int,
+	scores: Dictionary,
+	penalty_points: int
+) -> void:
+	turn_passed_received.emit(peer_id, next_turn, scores, penalty_points)
 
 
 @rpc("authority", "call_local", "reliable")
