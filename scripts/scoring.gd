@@ -17,7 +17,7 @@ func placement_score(piece_numbers: Array[int], board_features: Dictionary, play
 	var bonus := 0
 	var bonus_label := ""
 	var hexagon_count := int(board_features.get("hexagons", 0))
-	var penalty_points := _calculate_penalty_points(player_draw_count)
+	var penalty_points := draw_penalty(player_draw_count)
 	if hexagon_count > 0:
 		bonus = int(HEXAGON_BONUSES.get(hexagon_count, 0))
 		bonus_label = ["", "hexagon", "double hexagon", "triple hexagon"][hexagon_count]
@@ -33,7 +33,7 @@ func placement_score(piece_numbers: Array[int], board_features: Dictionary, play
 		"hexagons": hexagon_count
 	}
 
-func _calculate_penalty_points(player_draw_count: int) -> int:
+func draw_penalty(player_draw_count: int) -> int:
 	if player_draw_count == 0:
 		return 0
 	var penalty_points = 5 * (player_draw_count * player_draw_count) - 10 * player_draw_count + 10

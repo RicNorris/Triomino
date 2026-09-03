@@ -54,6 +54,9 @@ func _run() -> void:
 	if main.tray_pieces[host_piece_id].visible:
 		_fail("The placed piece should be unavailable in the host's tray")
 		return
+	if not _tray_indicators_match_board(main, 1):
+		_fail("Host tray indicators were not refreshed after the host placement")
+		return
 	var guest_id: int = main.state.current_player_id()
 	if not await _wait_until(func() -> bool: return main.board.placed_pieces.size() == 2):
 		_fail("Host did not receive the guest placement")
@@ -68,6 +71,9 @@ func _run() -> void:
 	if not main.state.has_used_piece(guest_id, guest_piece_id):
 		_fail("Guest tray did not consume its placed piece")
 		return
+	if not _tray_indicators_match_board(main, 1):
+		_fail("Host tray indicators were not refreshed after the guest placement")
+		return
 	print("Multiplayer host smoke test passed.")
 	quit()
 
@@ -78,6 +84,21 @@ func _wait_until(predicate: Callable, frame_limit: int = 600) -> bool:
 			return true
 		await process_frame
 	return false
+
+
+func _tray_indicators_match_board(main: Variant, peer_id: int) -> bool:
+	for piece_id in main.state.player_tray_piece_ids[peer_id]:
+		var piece: TriominoPiece = main.tray_pieces[piece_id]
+		if main.state.has_used_piece(peer_id, piece_id):
+			if piece.playability_indicator_visible:
+				return false
+			continue
+		var numbers: Array[int] = main.PieceCatalogScript.typed_numbers(main.piece_definitions[piece_id])
+		if not piece.playability_indicator_visible:
+			return false
+		if piece.can_play_anywhere != main.board.can_place_numbers_anywhere(numbers):
+			return false
+	return true
 
 
 func _fail(message: String) -> void:

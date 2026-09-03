@@ -11,6 +11,8 @@ const CARD_FILL := Color("#9b4c2d")
 const CARD_HOVER := Color("#b95f34")
 const PIP_FILL := Color("#fffaf0")
 const DEFAULT_FILL := Color("#f4ead8")
+const PLAYABLE_COLOR := Color("#2fbd83")
+const BLOCKED_COLOR := Color("#ee6572")
 const NUMBER_POSITION_RATIO := 0.49
 const NUMBER_BUBBLE_RATIO := 0.56
 const TILE_COLORS: Array[Color] = [
@@ -30,6 +32,8 @@ var is_selected := false
 var is_available := true
 var preview_alpha := 1.0
 var interactive := true
+var playability_indicator_visible := false
+var can_play_anywhere := false
 var _hovered := false
 var _motion_tween: Tween
 
@@ -55,6 +59,8 @@ func configure(
 	side_length = new_side_length
 	orientation_degrees = new_orientation
 	fill_color = new_fill
+	playability_indicator_visible = false
+	can_play_anywhere = false
 	queue_redraw()
 
 
@@ -68,6 +74,25 @@ func set_available(value: bool) -> void:
 	is_available = value
 	mouse_filter = Control.MOUSE_FILTER_STOP if value and interactive else Control.MOUSE_FILTER_IGNORE
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if value and interactive else Control.CURSOR_ARROW
+	queue_redraw()
+
+
+func set_display_size(box_size: Vector2, new_side_length: float) -> void:
+	custom_minimum_size = box_size
+	side_length = new_side_length
+	queue_redraw()
+
+
+func set_playability_indicator(show_indicator: bool, playable: bool) -> void:
+	if playability_indicator_visible == show_indicator and can_play_anywhere == playable:
+		return
+	playability_indicator_visible = show_indicator
+	can_play_anywhere = playable
+	tooltip_text = (
+		"Playable somewhere on the board"
+		if show_indicator and playable
+		else "No legal placement in any rotation" if show_indicator else ""
+	)
 	queue_redraw()
 
 
@@ -140,6 +165,22 @@ func _draw() -> void:
 		var points_color := Color("#ffe5bd")
 		points_color.a = 0.9 if is_available else 0.35
 		draw_string(font, points_pos, points_copy, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, points_color)
+		_draw_playability_indicator()
+
+
+func _draw_playability_indicator() -> void:
+	if not playability_indicator_visible:
+		return
+	var indicator_center := Vector2(size.x - 16.0, 16.0)
+	var indicator_color := PLAYABLE_COLOR if can_play_anywhere else BLOCKED_COLOR
+	draw_circle(indicator_center, 10.0, Color(0.12, 0.09, 0.18, 0.72))
+	draw_circle(indicator_center, 8.0, indicator_color)
+	if can_play_anywhere:
+		draw_line(indicator_center + Vector2(-4.0, 0.0), indicator_center + Vector2(-1.0, 3.0), Color.WHITE, 2.2, true)
+		draw_line(indicator_center + Vector2(-1.0, 3.0), indicator_center + Vector2(4.5, -3.5), Color.WHITE, 2.2, true)
+	else:
+		draw_line(indicator_center + Vector2(-3.5, -3.5), indicator_center + Vector2(3.5, 3.5), Color.WHITE, 2.2, true)
+		draw_line(indicator_center + Vector2(3.5, -3.5), indicator_center + Vector2(-3.5, 3.5), Color.WHITE, 2.2, true)
 
 
 static func get_triangle_vertices(center: Vector2, side: float, degrees: float) -> Array[Vector2]:

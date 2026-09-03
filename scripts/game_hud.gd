@@ -25,10 +25,10 @@ static func build(root: Control, board: Control) -> Dictionary:
 	var board_area := MarginContainer.new()
 	board_area.name = "BoardArea"
 	board_area.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	board_area.add_theme_constant_override("margin_left", 18)
-	board_area.add_theme_constant_override("margin_top", 166)
-	board_area.add_theme_constant_override("margin_right", 18)
-	board_area.add_theme_constant_override("margin_bottom", 62)
+	board_area.add_theme_constant_override("margin_left", 12)
+	board_area.add_theme_constant_override("margin_top", 126)
+	board_area.add_theme_constant_override("margin_right", 12)
+	board_area.add_theme_constant_override("margin_bottom", 14)
 	root.add_child(board_area)
 
 	var board_shell := PanelContainer.new()
@@ -46,20 +46,20 @@ static func build(root: Control, board: Control) -> Dictionary:
 	var top_margin := MarginContainer.new()
 	top_margin.name = "TopBarMargin"
 	top_margin.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top_margin.offset_left = 18
-	top_margin.offset_top = 16
-	top_margin.offset_right = -18
-	top_margin.offset_bottom = 82
+	top_margin.offset_left = 12
+	top_margin.offset_top = 10
+	top_margin.offset_right = -12
+	top_margin.offset_bottom = 64
 	root.add_child(top_margin)
 	var top_panel := PanelContainer.new()
 	top_panel.add_theme_stylebox_override("panel", _panel(Color("#4b4397"), Color("#8175d4"), 22, 8, 2))
 	top_margin.add_child(top_panel)
-	var top_padding := _margin(20, 10, 12, 10)
+	var top_padding := _margin(16, 6, 10, 6)
 	top_panel.add_child(top_padding)
 	var top_row := HBoxContainer.new()
 	top_row.add_theme_constant_override("separation", 12)
 	top_padding.add_child(top_row)
-	var brand := _label("▲  TRIOMINO!", 25, SUN)
+	var brand := _label("▲  TRIOMINO!", 21, SUN)
 	brand.add_theme_color_override("font_shadow_color", Color("#332c73"))
 	brand.add_theme_constant_override("shadow_offset_x", 2)
 	brand.add_theme_constant_override("shadow_offset_y", 3)
@@ -73,14 +73,14 @@ static func build(root: Control, board: Control) -> Dictionary:
 	top_row.add_child(table_label)
 	top_row.add_child(_spacer())
 	var turn_panel := PanelContainer.new()
-	turn_panel.custom_minimum_size = Vector2(260, 40)
+	turn_panel.custom_minimum_size = Vector2(244, 36)
 	turn_panel.add_theme_stylebox_override("panel", turn_style(false))
 	top_row.add_child(turn_panel)
 	var turn_label := _label("★  WHO GOES FIRST?  ★", 15, INK)
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	turn_panel.add_child(turn_label)
-	turn_panel.pivot_offset = Vector2(130, 20)
+	turn_panel.pivot_offset = Vector2(122, 18)
 	var badge_bob := turn_panel.create_tween().set_loops()
 	badge_bob.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	badge_bob.tween_property(turn_panel, "rotation_degrees", -0.7, 0.7)
@@ -88,18 +88,18 @@ static func build(root: Control, board: Control) -> Dictionary:
 	var score_caption := _label("MY SCORE", 10, Color("#ded9ff"))
 	score_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top_row.add_child(score_caption)
-	var score_value := _label("0", 30, SUN)
+	var score_value := _label("0", 26, SUN)
 	score_value.custom_minimum_size = Vector2(54, 0)
 	score_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	score_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top_row.add_child(score_value)
 	var reset_button := Button.new()
-	reset_button.custom_minimum_size = Vector2(112, 40)
+	reset_button.custom_minimum_size = Vector2(104, 34)
 	reset_button.text = "New round"
 	reset_button.disabled = true
 	_style_button(reset_button, Color("#8eb8ff"), INK)
 	var fullscreen_button := Button.new()
-	fullscreen_button.custom_minimum_size = Vector2(124, 40)
+	fullscreen_button.custom_minimum_size = Vector2(116, 34)
 	fullscreen_button.text = "□  Fullscreen"
 	fullscreen_button.tooltip_text = "Toggle fullscreen (F11)"
 	_style_button(fullscreen_button, Color("#c9a8ef"), INK)
@@ -109,10 +109,10 @@ static func build(root: Control, board: Control) -> Dictionary:
 	var player_margin := MarginContainer.new()
 	player_margin.name = "PlayerStrip"
 	player_margin.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	player_margin.offset_left = 18
-	player_margin.offset_top = 94
-	player_margin.offset_right = -18
-	player_margin.offset_bottom = 158
+	player_margin.offset_left = 12
+	player_margin.offset_top = 68
+	player_margin.offset_right = -12
+	player_margin.offset_bottom = 120
 	root.add_child(player_margin)
 	var player_cards := HBoxContainer.new()
 	player_cards.name = "PlayerCards"
@@ -127,9 +127,9 @@ static func build(root: Control, board: Control) -> Dictionary:
 	view_margin.name = "ViewControls"
 	view_margin.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	view_margin.offset_left = -386
-	view_margin.offset_top = 174
+	view_margin.offset_top = 134
 	view_margin.offset_right = -26
-	view_margin.offset_bottom = 220
+	view_margin.offset_bottom = 180
 	root.add_child(view_margin)
 	var view_panel := PanelContainer.new()
 	view_panel.add_theme_stylebox_override("panel", _panel(Color("#fff0c9"), Color("#3d315b"), 18, 5, 3))
@@ -166,109 +166,129 @@ static func build(root: Control, board: Control) -> Dictionary:
 	_style_button(center_view_button, SUN, INK)
 	view_row.add_child(center_view_button)
 
-	var hand_panel := PanelContainer.new()
-	hand_panel.name = "HandPanel"
-	hand_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	hand_panel.offset_top = -218
-	hand_panel.clip_contents = true
-	hand_panel.add_theme_stylebox_override("panel", _panel(WOOD, WOOD_DARK, 30, 14, 4))
-	root.add_child(hand_panel)
-	var hand_padding := _margin(20, 10, 20, 12)
-	hand_panel.add_child(hand_padding)
-	var hand_content := VBoxContainer.new()
-	hand_content.add_theme_constant_override("separation", 8)
-	hand_padding.add_child(hand_content)
-
-	var hand_header := HBoxContainer.new()
-	hand_header.add_theme_constant_override("separation", 10)
-	hand_content.add_child(hand_header)
-	var tray_title := _label("MY TILE BOX", 16, CREAM)
-	hand_header.add_child(tray_title)
-	var hand_count := _label("0 TILES", 11, Color("#ffe0b2"))
-	hand_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hand_header.add_child(hand_count)
-	hand_header.add_child(_spacer())
-	var tray_toggle := Button.new()
-	tray_toggle.name = "TrayToggle"
-	tray_toggle.custom_minimum_size = Vector2(154, 34)
-	tray_toggle.text = "▼  Hide my tiles"
-	_style_button(tray_toggle, SUN, INK)
-	hand_header.add_child(tray_toggle)
-	hand_header.add_child(_spacer())
-	var board_count := _label("0 tiles on the playmat", 11, Color("#ffe0b2"))
-	board_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hand_header.add_child(board_count)
-	var well_count := _label("MYSTERY PILE  0", 11, CREAM)
-	well_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hand_header.add_child(well_count)
-
-	var body := HBoxContainer.new()
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 14)
-	hand_content.add_child(body)
-	var tray_well := PanelContainer.new()
-	tray_well.name = "TrayWell"
-	tray_well.custom_minimum_size = Vector2(0, 118)
-	tray_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tray_well.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tray_well.add_theme_stylebox_override("panel", _panel(Color("#8f462b"), Color("#62301f"), 16, 0, 3))
-	body.add_child(tray_well)
-	var tray_padding := _margin(8, 5, 8, 5)
-	tray_well.add_child(tray_padding)
-	var tray := HFlowContainer.new()
-	tray.name = "PieceTray"
-	tray.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tray.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tray.add_theme_constant_override("h_separation", 8)
-	tray.add_theme_constant_override("v_separation", 8)
-	tray_padding.add_child(tray)
-
-	var action_column := VBoxContainer.new()
-	action_column.custom_minimum_size = Vector2(330, 0)
-	action_column.add_theme_constant_override("separation", 8)
-	body.add_child(action_column)
-	var status_panel := PanelContainer.new()
-	status_panel.custom_minimum_size = Vector2(0, 72)
-	status_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	status_panel.add_theme_stylebox_override("panel", _panel(Color("#fff0c9"), Color("#713923"), 14, 2, 3))
-	action_column.add_child(status_panel)
-	var status_margin := _margin(12, 8, 12, 8)
-	status_panel.add_child(status_margin)
+	var event_margin := MarginContainer.new()
+	event_margin.name = "GameEventBanner"
+	event_margin.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	event_margin.offset_left = -226
+	event_margin.offset_top = 134
+	event_margin.offset_right = 226
+	event_margin.offset_bottom = 204
+	event_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(event_margin)
+	var event_banner := PanelContainer.new()
+	event_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	event_banner.add_theme_stylebox_override("panel", event_style(SUN))
+	event_margin.add_child(event_banner)
+	var event_padding := _margin(14, 8, 16, 8)
+	event_banner.add_child(event_padding)
+	var event_row := HBoxContainer.new()
+	event_row.add_theme_constant_override("separation", 11)
+	event_padding.add_child(event_row)
+	var event_icon := _label("★", 28, PURPLE)
+	event_icon.custom_minimum_size = Vector2(38, 0)
+	event_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	event_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	event_row.add_child(event_icon)
 	var status_copy := VBoxContainer.new()
-	status_copy.add_theme_constant_override("separation", 2)
-	status_margin.add_child(status_copy)
+	status_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_copy.add_theme_constant_override("separation", 1)
+	event_row.add_child(status_copy)
 	var status := _label("Pick a tile!", 16, INK)
 	status_copy.add_child(status)
 	var instructions := _label("Grab one from the box and pop it onto a green spot.", 11, MUTED)
-	instructions.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	instructions.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	status_copy.add_child(instructions)
 
+	var action_dock := MarginContainer.new()
+	action_dock.name = "ActionDock"
+	action_dock.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	action_dock.offset_left = -404
+	action_dock.offset_top = -206
+	action_dock.offset_right = -18
+	action_dock.offset_bottom = -156
+	root.add_child(action_dock)
+	var action_panel := PanelContainer.new()
+	action_panel.add_theme_stylebox_override("panel", _panel(Color("#4b4397"), Color("#fff0c9"), 18, 6, 3))
+	action_dock.add_child(action_panel)
+	var action_padding := _margin(8, 5, 8, 5)
+	action_panel.add_child(action_padding)
 	var controls := HBoxContainer.new()
 	controls.add_theme_constant_override("separation", 8)
-	action_column.add_child(controls)
+	action_padding.add_child(controls)
 	var rotate_button := Button.new()
-	rotate_button.custom_minimum_size = Vector2(0, 40)
+	rotate_button.custom_minimum_size = Vector2(148, 38)
 	rotate_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rotate_button.text = "↻  Rotate  R"
 	rotate_button.disabled = true
 	_style_button(rotate_button, Color("#ffd34e"), INK)
 	controls.add_child(rotate_button)
 	var draw_button := Button.new()
-	draw_button.custom_minimum_size = Vector2(0, 40)
+	draw_button.custom_minimum_size = Vector2(138, 38)
 	draw_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	draw_button.text = "+  Draw tile"
 	_style_button(draw_button, Color("#67d5c0"), INK)
 	controls.add_child(draw_button)
-	var pass_turn_button := Button.new()
-	pass_turn_button.custom_minimum_size = Vector2(0, 40)
-	pass_turn_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pass_turn_button.text = "→  Pass turn"
-	pass_turn_button.tooltip_text = "End your turn without placing a tile"
-	_style_button(pass_turn_button, Color("#ff9d9d"), INK)
-	controls.add_child(pass_turn_button)
 	var draw_count := _label("0 / 3", 10, CREAM)
 	draw_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	controls.add_child(draw_count)
+
+	var hand_panel := PanelContainer.new()
+	hand_panel.name = "HandPanel"
+	hand_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	hand_panel.offset_top = -148
+	hand_panel.clip_contents = true
+	hand_panel.add_theme_stylebox_override("panel", _panel(WOOD, WOOD_DARK, 26, 12, 4))
+	root.add_child(hand_panel)
+	var hand_padding := _margin(14, 7, 14, 9)
+	hand_panel.add_child(hand_padding)
+	var hand_content := VBoxContainer.new()
+	hand_content.add_theme_constant_override("separation", 5)
+	hand_padding.add_child(hand_content)
+
+	var hand_header := HBoxContainer.new()
+	hand_header.add_theme_constant_override("separation", 9)
+	hand_content.add_child(hand_header)
+	var tray_title := _label("MY TILES", 14, CREAM)
+	hand_header.add_child(tray_title)
+	var hand_count := _label("0 TILES", 10, Color("#ffe0b2"))
+	hand_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hand_header.add_child(hand_count)
+	hand_header.add_child(_spacer())
+	var board_count := _label("0 tiles on the playmat", 10, Color("#ffe0b2"))
+	board_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hand_header.add_child(board_count)
+	var well_count := _label("MYSTERY PILE  0", 10, CREAM)
+	well_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hand_header.add_child(well_count)
+	var tray_toggle := Button.new()
+	tray_toggle.name = "TrayToggle"
+	tray_toggle.custom_minimum_size = Vector2(144, 30)
+	tray_toggle.text = "▼  Hide my tiles"
+	_style_button(tray_toggle, SUN, INK)
+	hand_header.add_child(tray_toggle)
+
+	var tray_well := PanelContainer.new()
+	tray_well.name = "TrayWell"
+	tray_well.custom_minimum_size = Vector2(0, 94)
+	tray_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tray_well.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tray_well.add_theme_stylebox_override("panel", _panel(Color("#8f462b"), Color("#62301f"), 14, 0, 3))
+	hand_content.add_child(tray_well)
+	var tray_padding := _margin(6, 3, 6, 3)
+	tray_well.add_child(tray_padding)
+	var tray := HBoxContainer.new()
+	tray.name = "PieceTray"
+	tray.alignment = BoxContainer.ALIGNMENT_CENTER
+	tray.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tray.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tray.add_theme_constant_override("separation", 6)
+	tray_padding.add_child(tray)
+
+	var fx_layer := Control.new()
+	fx_layer.name = "GameFxLayer"
+	fx_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(fx_layer)
 
 	_style_overlays(root)
 	root.move_child(root.get_node("LobbyOverlay"), root.get_child_count() - 1)
@@ -283,7 +303,6 @@ static func build(root: Control, board: Control) -> Dictionary:
 		"instructions": instructions,
 		"rotate_button": rotate_button,
 		"draw_button": draw_button,
-		"pass_turn_button": pass_turn_button,
 		"draw_count": draw_count,
 		"board_count": board_count,
 		"hand_count": hand_count,
@@ -291,6 +310,10 @@ static func build(root: Control, board: Control) -> Dictionary:
 		"reset_button": reset_button,
 		"fullscreen_button": fullscreen_button,
 		"hand_panel": hand_panel,
+		"action_dock": action_dock,
+		"event_banner": event_banner,
+		"event_icon": event_icon,
+		"fx_layer": fx_layer,
 		"tray_toggle": tray_toggle,
 		"tray_well": tray_well,
 		"board_area": board_area,
@@ -317,6 +340,10 @@ static func turn_style(local_turn: bool) -> StyleBoxFlat:
 		5,
 		3
 	)
+
+
+static func event_style(accent: Color) -> StyleBoxFlat:
+	return _panel(Color("#fff8df"), accent, 18, 7, 4)
 
 
 static func _style_overlays(root: Control) -> void:

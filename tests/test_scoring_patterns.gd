@@ -16,6 +16,10 @@ func _run() -> void:
 	var board: TriominoBoard = main.board
 	var candidate_center := board.size * 0.5
 	var numbers: Array[int] = [1, 2, 3]
+	_expect(main.scoring.draw_penalty(0) == 0, "No draw should have no penalty")
+	_expect(main.scoring.draw_penalty(1) == 5, "The first draw should cost 5 points")
+	_expect(main.scoring.draw_penalty(2) == 10, "The second draw should bring the penalty to 10 points")
+	_expect(main.scoring.draw_penalty(3) == 25, "Three unsuccessful draws should cost 25 points")
 
 	_build_bridge(board, candidate_center)
 	var bridge_score: Dictionary = main.scoring.placement_score(

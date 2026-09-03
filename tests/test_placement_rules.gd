@@ -26,6 +26,27 @@ func _init() -> void:
 		legal[mismatch_index] = 9 if legal[mismatch_index] != 9 else 8
 		_expect(not board._candidate_is_legal(candidate, legal), "Edge %d should reject a mismatch" % edge_index)
 
+	var requires_rotation: Array[int] = [2, 1, 4]
+	var first_edge := board._candidate_across_edge(placed, 0)
+	_expect(
+		not board._candidate_is_legal(first_edge, requires_rotation),
+		"The rotation-search fixture should not fit in its starting rotation"
+	)
+	_expect(
+		board.can_place_numbers_anywhere(requires_rotation),
+		"A piece should be playable when one of its other rotations fits"
+	)
+	_expect(
+		not board.can_place_numbers_anywhere([9, 9, 9]),
+		"A piece with no matching rotation should not be marked playable"
+	)
+	board.placed_pieces.clear()
+	_expect(
+		board.can_place_numbers_anywhere([9, 9, 9]),
+		"Every valid piece should be playable on an empty board"
+	)
+	board.placed_pieces.append(placed)
+
 	_test_single_tip_contact(board)
 	board.free()
 	if _failures == 0:

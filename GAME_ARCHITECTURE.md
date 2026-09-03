@@ -141,6 +141,18 @@ numbers, rotation, selection, and availability. A piece node does not decide
 whether it belongs to a player; `main.gd` reads the assignment from `state` and
 shows or hides the node.
 
+### `scripts/game_hud.gd` — runtime HUD composition
+
+The main game HUD is built in code rather than stored in `main.tscn`. It keeps
+the board as the dominant surface, sizes every local tray tile to fit in one
+non-scrolling row, and returns references to the compact action dock, event
+banner, and presentation-effects layer.
+
+`main.gd` drives presentation from accepted network events. Draw flights,
+placement drops, score punches, automatic-pass notices, and turn pulses never
+decide or delay game state; they only visualize state that has already been
+accepted.
+
 ### `scripts/lobby_code.gd` — lobby-code encoding
 
 This utility converts an IPv4 address and UDP port into the shareable `TRI-...`
@@ -186,13 +198,17 @@ The draw flow follows this route:
 5. The host broadcasts the accepted draw through `multiplayer_session.gd`.
 6. Every peer uses `game_state.gd` to append that ID to the correct tray.
 7. The requesting player's copy reveals the newly drawn tile in its tray UI.
+8. After a third draw, the host checks every unused tray piece in all three
+   rotations. If none fits an open board position, it broadcasts an automatic
+   turn pass together with the updated scores and 25-point draw penalty.
 
 Do not let each client draw independently from its own random well. Only the
 host should remove the piece, then tell every client what was drawn.
 
-Drawing currently keeps the same player's turn so they may place a piece next.
-The host also broadcasts the remaining well count, allowing every peer to
-disable its draw button when that count reaches zero.
+Drawing keeps the same player's turn while fewer than three pieces have been
+drawn, or when a legal move exists after the third draw. The host also
+broadcasts the remaining well count, allowing every peer to disable its draw
+button when that count reaches zero.
 
 ## A practical rule for future code
 

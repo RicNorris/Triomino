@@ -66,6 +66,11 @@ func begin_turn(turn_index: int) -> void:
 	player_current_turn_draws = 0
 
 
+func apply_turn_pass(scores: Dictionary, next_turn: int) -> void:
+	player_scores = scores.duplicate()
+	begin_turn(next_turn)
+
+
 func add_piece_to_tray(peer_id: int, piece_id: int) -> void:
 	var tray_ids: Array = player_tray_piece_ids.get(peer_id, [])
 	if not tray_ids.has(piece_id):
